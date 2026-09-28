@@ -15,79 +15,148 @@ import {
   ChevronDown,
   Layers,
   Wrench,
+  RotateCcw,
+  Database,
+  Building2,
+  Check,
 } from "lucide-react";
-
 import { useFabricazeStore } from "@/lib/fabricazeStore";
-import { RotateCcw } from "lucide-react";
 
 export function Header() {
   const pathname = usePathname();
-  const { resetAllToZero } = useFabricazeStore();
-  const [activeRole, setActiveRole] = useState<"client" | "manufacturer" | "admin">(
-    pathname.startsWith("/admin")
-      ? "admin"
-      : pathname.startsWith("/manufacturer")
-      ? "manufacturer"
-      : "client"
-  );
+  const {
+    activeRole,
+    setActiveRole,
+    activeClientId,
+    setActiveClientId,
+    activeManufacturerId,
+    setActiveManufacturerId,
+    clients,
+    manufacturers,
+    activeClient,
+    activeManufacturer,
+    resetAllToZero,
+  } = useFabricazeStore();
+
+  const isClientRoute = pathname.startsWith("/client") || pathname === "/";
+  const isMfgRoute = pathname.startsWith("/manufacturer");
+  const isAdminRoute = pathname.startsWith("/admin");
 
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-xs">
-      {/* Demo Switcher & Hub Bar */}
-      <div className="bg-slate-900 text-white text-xs px-4 py-1.5 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span className="font-medium text-slate-300">
-            Fabricaze Platform • MSME Manufacturing Network (Indore • Pune • Ahmedabad)
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={resetAllToZero}
-            className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-red-950/60 hover:bg-red-900 text-red-200 border border-red-800/80 transition"
-            title="Reset platform data to clean slate"
-          >
-            <RotateCcw className="w-3 h-3 text-red-400" />
-            <span>Reset to Zero</span>
-          </button>
+      {/* Top Multi-Tenant Context & Role Switcher Bar */}
+      <div className="bg-slate-900 text-white text-xs px-4 py-2 flex flex-wrap items-center justify-between gap-3">
+        {/* Left: Role Switcher & Context */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1.5 text-slate-300 font-semibold text-[11px] uppercase tracking-wider">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Multi-Tenant Phase:</span>
+          </div>
 
-          <span className="text-slate-400 hidden sm:inline">Active Perspective:</span>
-          <div className="inline-flex rounded-md bg-slate-800 p-0.5 border border-slate-700">
+          <div className="inline-flex rounded-lg bg-slate-800 p-0.5 border border-slate-700">
             <Link
               href="/client/submit-job"
-              onClick={() => setActiveRole("client")}
-              className={`px-2.5 py-0.5 rounded text-xs transition-colors ${
-                activeRole === "client" && !pathname.startsWith("/admin") && !pathname.startsWith("/manufacturer")
-                  ? "bg-blue-600 text-white font-medium"
+              onClick={() => setActiveRole("CLIENT")}
+              className={`px-3 py-1 rounded-md text-xs font-semibold transition ${
+                isClientRoute
+                  ? "bg-blue-600 text-white shadow-xs"
                   : "text-slate-300 hover:text-white"
               }`}
             >
-              Buyer / Client
+              Client Phase
             </Link>
+
             <Link
               href="/manufacturer/dashboard"
-              onClick={() => setActiveRole("manufacturer")}
-              className={`px-2.5 py-0.5 rounded text-xs transition-colors ${
-                pathname.startsWith("/manufacturer")
-                  ? "bg-amber-600 text-white font-medium"
+              onClick={() => setActiveRole("MANUFACTURER")}
+              className={`px-3 py-1 rounded-md text-xs font-semibold transition ${
+                isMfgRoute
+                  ? "bg-amber-600 text-white shadow-xs"
                   : "text-slate-300 hover:text-white"
               }`}
             >
               Manufacturer Hub
             </Link>
+
             <Link
               href="/admin/dashboard"
-              onClick={() => setActiveRole("admin")}
-              className={`px-2.5 py-0.5 rounded text-xs transition-colors ${
-                pathname.startsWith("/admin")
-                  ? "bg-indigo-600 text-white font-medium"
+              onClick={() => setActiveRole("ADMIN")}
+              className={`px-3 py-1 rounded-md text-xs font-semibold transition ${
+                isAdminRoute
+                  ? "bg-indigo-600 text-white shadow-xs"
                   : "text-slate-300 hover:text-white"
               }`}
             >
               Super Admin
             </Link>
           </div>
+        </div>
+
+        {/* Right: Active Profile Picker (Client vs Manufacturer vs Admin Database) */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Client Selector (when in Client view) */}
+          {isClientRoute && (
+            <div className="flex items-center gap-2 bg-slate-800/90 border border-slate-700 rounded-lg px-2.5 py-1">
+              <span className="text-[10px] text-slate-400 uppercase font-bold">Active Buyer:</span>
+              <select
+                value={activeClientId}
+                onChange={(e) => setActiveClientId(e.target.value)}
+                className="bg-transparent text-white text-xs font-bold focus:outline-none cursor-pointer"
+              >
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id} className="bg-slate-800 text-white">
+                    {c.fullName} ({c.companyName})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Manufacturer Selector (when in Manufacturer view) */}
+          {isMfgRoute && (
+            <div className="flex items-center gap-2 bg-slate-800/90 border border-slate-700 rounded-lg px-2.5 py-1">
+              <span className="text-[10px] text-slate-400 uppercase font-bold">Active Shop:</span>
+              <select
+                value={activeManufacturerId}
+                onChange={(e) => setActiveManufacturerId(e.target.value)}
+                className="bg-transparent text-white text-xs font-bold focus:outline-none cursor-pointer"
+              >
+                {manufacturers.map((m) => (
+                  <option key={m.id} value={m.id} className="bg-slate-800 text-white">
+                    {m.pseudoName} ({m.city})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Database Visualizer Quick Link (Super Admin) */}
+          <Link
+            href="/admin/database"
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition ${
+              pathname === "/admin/database"
+                ? "bg-emerald-600 text-white"
+                : "bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700"
+            }`}
+          >
+            <Database className="w-3.5 h-3.5" />
+            <span>Database Visualizer</span>
+          </Link>
+
+          {/* Reset to Zero */}
+          <button
+            type="button"
+            onClick={() => {
+              if (confirm("Reset the entire platform state to zero?")) {
+                resetAllToZero();
+              }
+            }}
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs bg-red-950/60 hover:bg-red-900 text-red-200 border border-red-800/80 transition"
+            title="Reset platform data to clean slate"
+          >
+            <RotateCcw className="w-3 h-3 text-red-400" />
+            <span>Reset to Zero</span>
+          </button>
         </div>
       </div>
 
@@ -110,95 +179,190 @@ export function Header() {
               </div>
             </Link>
 
-            {/* Navigation Links */}
+            {/* Navigation Links based on active role */}
             <nav className="hidden md:flex items-center gap-1">
-              <Link
-                href="/client/submit-job"
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  pathname === "/client/submit-job"
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                }`}
-              >
-                <UploadCloud className="w-4 h-4 text-blue-600" />
-                Submit Job
-              </Link>
+              {isMfgRoute ? (
+                <>
+                  <Link
+                    href="/manufacturer/dashboard"
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      pathname === "/manufacturer/dashboard"
+                        ? "bg-amber-50 text-amber-800 font-bold"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                    }`}
+                  >
+                    <Briefcase className="w-4 h-4 text-amber-600" />
+                    Marketplace RFQs
+                  </Link>
 
-              <Link
-                href="/client/bids"
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  pathname === "/client/bids"
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                }`}
-              >
-                <FileText className="w-4 h-4 text-blue-600" />
-                View Bids
-              </Link>
+                  <Link
+                    href="/manufacturer/machines"
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      pathname === "/manufacturer/machines"
+                        ? "bg-amber-50 text-amber-800 font-bold"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                    }`}
+                  >
+                    <Wrench className="w-4 h-4 text-amber-600" />
+                    Shop Machine Fleet
+                  </Link>
+                </>
+              ) : isAdminRoute ? (
+                <>
+                  <Link
+                    href="/admin/dashboard"
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      pathname === "/admin/dashboard"
+                        ? "bg-indigo-50 text-indigo-700 font-bold"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                    }`}
+                  >
+                    <Layers className="w-4 h-4 text-indigo-600" />
+                    Executive Dashboard
+                  </Link>
 
-              <Link
-                href="/client/manufacturers"
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  pathname === "/client/manufacturers"
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                }`}
-              >
-                <Users className="w-4 h-4 text-blue-600" />
-                Find Manufacturers
-              </Link>
+                  <Link
+                    href="/admin/database"
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      pathname === "/admin/database"
+                        ? "bg-emerald-50 text-emerald-700 font-bold"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                    }`}
+                  >
+                    <Database className="w-4 h-4 text-emerald-600" />
+                    Database Visualizer
+                  </Link>
 
-              <Link
-                href="/client/orders"
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  pathname === "/client/orders"
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                }`}
-              >
-                <ShieldCheck className="w-4 h-4 text-blue-600" />
-                Orders & QC
-              </Link>
+                  <Link
+                    href="/admin/jobs"
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      pathname === "/admin/jobs"
+                        ? "bg-indigo-50 text-indigo-700 font-bold"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                    }`}
+                  >
+                    <Briefcase className="w-4 h-4 text-indigo-600" />
+                    Job Management
+                  </Link>
+
+                  <Link
+                    href="/admin/quotes"
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      pathname === "/admin/quotes"
+                        ? "bg-indigo-50 text-indigo-700 font-bold"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                    }`}
+                  >
+                    <FileText className="w-4 h-4 text-indigo-600" />
+                    Quote Audits
+                  </Link>
+
+                  <Link
+                    href="/admin/disputes"
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      pathname === "/admin/disputes"
+                        ? "bg-indigo-50 text-indigo-700 font-bold"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                    }`}
+                  >
+                    <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                    Disputes
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/client/submit-job"
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      pathname === "/client/submit-job"
+                        ? "bg-blue-50 text-blue-700 font-bold"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                    }`}
+                  >
+                    <UploadCloud className="w-4 h-4 text-blue-600" />
+                    Submit Job (RFQ)
+                  </Link>
+
+                  <Link
+                    href="/client/bids"
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      pathname === "/client/bids"
+                        ? "bg-blue-50 text-blue-700 font-bold"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                    }`}
+                  >
+                    <FileText className="w-4 h-4 text-blue-600" />
+                    View Bids
+                  </Link>
+
+                  <Link
+                    href="/client/orders"
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      pathname === "/client/orders"
+                        ? "bg-blue-50 text-blue-700 font-bold"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                    }`}
+                  >
+                    <ShieldCheck className="w-4 h-4 text-blue-600" />
+                    Orders & Escrow
+                  </Link>
+
+                  <Link
+                    href="/client/manufacturers"
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      pathname === "/client/manufacturers"
+                        ? "bg-blue-50 text-blue-700 font-bold"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                    }`}
+                  >
+                    <Users className="w-4 h-4 text-blue-600" />
+                    Directory
+                  </Link>
+                </>
+              )}
             </nav>
           </div>
 
-          {/* Right Side: Global Search & Admin Quick Controls */}
+          {/* Right Side: Persona Indicator & Admin Settings */}
           <div className="flex items-center gap-3">
-            <div className="relative hidden sm:block w-56">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search manufacturers..."
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
-              />
-            </div>
-
-            <button
-              title="Notifications"
-              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors relative"
+            <Link
+              href="/admin/database"
+              className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+              title="Database Visualizer"
             >
-              <Bell className="w-4 h-4" />
-              <span className="w-2 h-2 rounded-full bg-red-500 absolute top-1.5 right-1.5"></span>
-            </button>
+              <Database className="w-4 h-4" />
+            </Link>
 
             <Link
               href="/admin/dashboard"
               className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-              title="Admin Settings"
+              title="Super Admin Controls"
             >
               <Settings className="w-4 h-4" />
             </Link>
 
-            <div className="h-6 w-px bg-gray-200 mx-1"></div>
+            <div className="h-6 w-px bg-gray-200 mx-1" />
 
-            {/* Profile Pill */}
+            {/* Profile Avatar & Label */}
             <div className="flex items-center gap-2 pl-1">
-              <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-semibold text-xs flex items-center justify-center border border-blue-200">
-                AJ
+              <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold text-xs flex items-center justify-center border border-blue-200">
+                {isMfgRoute ? "MF" : isAdminRoute ? "SA" : "AJ"}
               </div>
               <div className="hidden lg:block text-left leading-tight">
-                <span className="text-xs font-semibold text-gray-800 block">Ayush Jain</span>
-                <span className="text-[10px] text-gray-500 block">Co-Founder</span>
+                <span className="text-xs font-bold text-gray-800 block">
+                  {isMfgRoute
+                    ? activeManufacturer.pseudoName
+                    : isAdminRoute
+                    ? "Super Admin (Ayush)"
+                    : activeClient.fullName}
+                </span>
+                <span className="text-[10px] text-gray-500 block">
+                  {isMfgRoute
+                    ? activeManufacturer.city
+                    : isAdminRoute
+                    ? "Platform God-Mode"
+                    : activeClient.companyName}
+                </span>
               </div>
             </div>
           </div>
@@ -207,3 +371,9 @@ export function Header() {
     </header>
   );
 }
+
+function Briefcase(props: any) {
+  return <BriefcaseIcon {...props} />;
+}
+
+import { Briefcase as BriefcaseIcon } from "lucide-react";

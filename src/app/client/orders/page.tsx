@@ -39,15 +39,15 @@ const MILESTONE_LABELS: Record<IOrder["currentMilestone"], string> = {
 };
 
 export default function ClientOrdersPage() {
-  const { orders, advanceOrderMilestone, raiseDispute } = useFabricazeStore();
+  const { myOrders, advanceOrderMilestone, raiseDispute, activeClient } = useFabricazeStore();
   const [activeTab, setActiveTab] = useState<"active" | "completed">("active");
   const [disputeModalOrder, setDisputeModalOrder] = useState<IOrder | null>(null);
   const [disputeIssueType, setDisputeIssueType] = useState<IDispute["issueType"]>("Quality Issue");
   const [disputeDescription, setDisputeDescription] = useState("");
   const [disputeSuccessMsg, setDisputeSuccessMsg] = useState<string | null>(null);
 
-  const activeOrders = orders.filter((o) => o.currentMilestone !== "DELIVERED");
-  const completedOrders = orders.filter((o) => o.currentMilestone === "DELIVERED");
+  const activeOrders = myOrders.filter((o) => o.currentMilestone !== "DELIVERED");
+  const completedOrders = myOrders.filter((o) => o.currentMilestone === "DELIVERED");
 
   const displayedOrders = activeTab === "active" ? activeOrders : completedOrders;
 

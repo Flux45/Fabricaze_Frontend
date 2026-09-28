@@ -23,18 +23,18 @@ import { useFabricazeStore } from "@/lib/fabricazeStore";
 import { IQuotation } from "@/types";
 
 export default function ViewBidsPage() {
-  const { rfqs, quotations, awardQuotation } = useFabricazeStore();
+  const { myRfqs, quotations, awardQuotation, activeClient } = useFabricazeStore();
 
-  // If there are RFQs, default to the most recent one
-  const activeRfq = rfqs.length > 0 ? rfqs[0] : null;
+  // If there are RFQs for this client, default to the most recent one
+  const activeRfq = myRfqs.length > 0 ? myRfqs[0] : null;
   const [selectedRfqId, setSelectedRfqId] = useState<string>(activeRfq?.id || "");
 
-  const currentRfq = rfqs.find((r) => r.id === selectedRfqId) || activeRfq;
+  const currentRfq = myRfqs.find((r) => r.id === selectedRfqId) || activeRfq;
 
   // Filter quotes relevant to current RFQ (or all quotes if no specific RFQ)
   const relevantQuotes = currentRfq
     ? quotations.filter((q) => q.enquiryId === currentRfq.id)
-    : quotations;
+    : [];
 
   const [selectedCity, setSelectedCity] = useState("All Cities");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
@@ -118,7 +118,7 @@ export default function ViewBidsPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {rfqs.length > 1 && (
+            {myRfqs.length > 1 && (
               <select
                 value={selectedRfqId}
                 onChange={(e) => {
@@ -127,7 +127,7 @@ export default function ViewBidsPage() {
                 }}
                 className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {rfqs.map((r) => (
+                {myRfqs.map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.enquiryCode} - {r.title}
                   </option>

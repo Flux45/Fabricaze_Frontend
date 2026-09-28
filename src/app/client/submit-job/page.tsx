@@ -18,7 +18,7 @@ import { useFabricazeStore } from "@/lib/fabricazeStore";
 
 export default function SubmitJobPage() {
   const router = useRouter();
-  const { createRfq } = useFabricazeStore();
+  const { createRfq, activeClient } = useFabricazeStore();
 
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -111,11 +111,14 @@ export default function SubmitJobPage() {
         <div className="flex items-center justify-between border-b border-gray-200 pb-4 mb-8">
           <div>
             <span className="text-xs font-semibold uppercase tracking-wider text-blue-600">
-              Buyer Portal • Step 1
+              Posting as: {activeClient.fullName} ({activeClient.companyName}) • Step 1
             </span>
             <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
               Post CAD Manufacturing RFQ
             </h1>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Inquiry will be isolated to {activeClient.fullName}'s account in the client database.
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <Link

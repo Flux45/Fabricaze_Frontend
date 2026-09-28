@@ -1,11 +1,111 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { IManufacturer, IEnquiry, IQuotation, IOrder, IDispute, IMachine } from "@/types";
+import { IClient, IManufacturer, IEnquiry, IQuotation, IOrder, IDispute, IMachine } from "@/types";
 import { STANDARD_INDUSTRIAL_MACHINES } from "./machineCatalog";
 
+export const INITIAL_CLIENTS: IClient[] = [
+  {
+    id: "cli-1",
+    fullName: "Ayush Jain",
+    companyName: "Fabricaze Dynamics Ltd",
+    email: "ayush@fabricaze.com",
+    phoneNumber: "+91 98260 11223",
+    city: "Indore",
+    state: "Madhya Pradesh",
+    industry: "Industrial Automation & Robotics",
+    createdAt: "2026-09-01",
+  },
+  {
+    id: "cli-2",
+    fullName: "Rohan Verma",
+    companyName: "AeroPrecision Systems Pvt Ltd",
+    email: "rohan.v@aeroprecision.in",
+    phoneNumber: "+91 94250 88990",
+    city: "Pune",
+    state: "Maharashtra",
+    industry: "Aerospace & Defence Components",
+    createdAt: "2026-09-10",
+  },
+  {
+    id: "cli-3",
+    fullName: "Vikram Singhania",
+    companyName: "Titan Medical Devices",
+    email: "vikram@titanmed.org",
+    phoneNumber: "+91 98450 33441",
+    city: "Bengaluru",
+    state: "Karnataka",
+    industry: "Surgical Instruments & Prosthetics",
+    createdAt: "2026-09-15",
+  },
+];
+
+export const INITIAL_MANUFACTURERS_MULTI: IManufacturer[] = [
+  {
+    id: "mfg-1",
+    companyName: "Indore Precision CNC Works",
+    pseudoName: "Precision MSME #IND-4102",
+    city: "Indore",
+    state: "Madhya Pradesh",
+    rating: 4.9,
+    reviewCount: 42,
+    verificationStatus: "VERIFIED",
+    distanceKm: 8,
+    responseTime: "< 1 hour",
+    priceRange: "₹₹",
+    capabilities: ["CNC Machining", "Lathe Turning", "CMM Inspection"],
+    certifications: ["ISO 9001:2015", "MSME ZED Gold"],
+    specialties: ["Aluminum Turning", "Close Tolerance Shafts"],
+  },
+  {
+    id: "mfg-2",
+    companyName: "Metro AeroTech Fabricators",
+    pseudoName: "Metro Fabricators #PUN-9821",
+    city: "Pune",
+    state: "Maharashtra",
+    rating: 4.8,
+    reviewCount: 68,
+    verificationStatus: "VERIFIED",
+    distanceKm: 14,
+    responseTime: "< 2 hours",
+    priceRange: "₹₹₹",
+    capabilities: ["5-Axis CNC", "Fiber Laser Cutting", "Heat Treatment"],
+    certifications: ["ISO 9001:2015", "AS9100D"],
+    specialties: ["Titanium Machining", "Complex Impellers"],
+  },
+  {
+    id: "mfg-3",
+    companyName: "Gujarat Toolcraft Industries",
+    pseudoName: "Apex Toolcraft #AHM-6503",
+    city: "Ahmedabad",
+    state: "Gujarat",
+    rating: 4.7,
+    reviewCount: 31,
+    verificationStatus: "VERIFIED",
+    distanceKm: 22,
+    responseTime: "< 3 hours",
+    priceRange: "₹₹",
+    capabilities: ["Sheet Metal", "Press Brake", "Industrial 3D Printing"],
+    certifications: ["ISO 9001:2015"],
+    specialties: ["Enclosures", "Rapid Sheet Prototyping"],
+  },
+];
+
 interface FabricazeStoreContextType {
-  // Data lists
+  // Multitenancy & Active Persona
+  activeRole: "CLIENT" | "MANUFACTURER" | "ADMIN";
+  activeClientId: string;
+  activeManufacturerId: string;
+  setActiveRole: (role: "CLIENT" | "MANUFACTURER" | "ADMIN") => void;
+  setActiveClientId: (id: string) => void;
+  setActiveManufacturerId: (id: string) => void;
+
+  // Active user objects
+  activeClient: IClient;
+  activeManufacturer: IManufacturer;
+
+  // Database tables
+  clients: IClient[];
   manufacturers: IManufacturer[];
   machines: IMachine[];
   rfqs: IEnquiry[];
@@ -13,7 +113,14 @@ interface FabricazeStoreContextType {
   orders: IOrder[];
   disputes: IDispute[];
 
+  // Tenant-scoped lists
+  myRfqs: IEnquiry[];
+  myOrders: IOrder[];
+  mfgSubmittedQuotes: IQuotation[];
+  mfgAssignedOrders: IOrder[];
+
   // Action methods
+  createClient: (clientData: Partial<IClient>) => IClient;
   createRfq: (rfqData: Partial<IEnquiry>) => IEnquiry;
   submitQuotation: (quoteData: Partial<IQuotation>) => IQuotation;
   awardQuotation: (rfqId: string, quoteId: string) => IOrder;
@@ -27,11 +134,17 @@ interface FabricazeStoreContextType {
 
 const FabricazeStoreContext = createContext<FabricazeStoreContextType | null>(null);
 
-const STORAGE_KEY = "fabricaze_platform_clean_state_v1";
+const STORAGE_KEY = "fabricaze_platform_clean_state_v2";
 
 export function FabricazeStoreProvider({ children }: { children: React.ReactNode }) {
-  // Clean slate states (starts strictly at ZERO)
-  const [manufacturers, setManufacturers] = useState<IManufacturer[]>([]);
+  // Multitenancy persona state
+  const [activeRole, setActiveRole] = useState<"CLIENT" | "MANUFACTURER" | "ADMIN">("CLIENT");
+  const [activeClientId, setActiveClientId] = useState<string>("cli-1");
+  const [activeManufacturerId, setActiveManufacturerId] = useState<string>("mfg-1");
+
+  // Database entities
+  const [clients, setClients] = useState<IClient[]>(INITIAL_CLIENTS);
+  const [manufacturers, setManufacturers] = useState<IManufacturer[]>(INITIAL_MANUFACTURERS_MULTI);
   const [machines, setMachines] = useState<IMachine[]>(STANDARD_INDUSTRIAL_MACHINES);
   const [rfqs, setRfqs] = useState<IEnquiry[]>([]);
   const [quotations, setQuotations] = useState<IQuotation[]>([]);
@@ -39,18 +152,22 @@ export function FabricazeStoreProvider({ children }: { children: React.ReactNode
   const [disputes, setDisputes] = useState<IDispute[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Load from local storage or initialize clean zero state
+  // Load from local storage
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        setManufacturers(parsed.manufacturers || []);
-        setMachines(parsed.machines || STANDARD_INDUSTRIAL_MACHINES);
-        setRfqs(parsed.rfqs || []);
-        setQuotations(parsed.quotations || []);
-        setOrders(parsed.orders || []);
-        setDisputes(parsed.disputes || []);
+        if (parsed.clients && parsed.clients.length > 0) setClients(parsed.clients);
+        if (parsed.manufacturers && parsed.manufacturers.length > 0) setManufacturers(parsed.manufacturers);
+        if (parsed.machines) setMachines(parsed.machines);
+        if (parsed.rfqs) setRfqs(parsed.rfqs);
+        if (parsed.quotations) setQuotations(parsed.quotations);
+        if (parsed.orders) setOrders(parsed.orders);
+        if (parsed.disputes) setDisputes(parsed.disputes);
+        if (parsed.activeRole) setActiveRole(parsed.activeRole);
+        if (parsed.activeClientId) setActiveClientId(parsed.activeClientId);
+        if (parsed.activeManufacturerId) setActiveManufacturerId(parsed.activeManufacturerId);
       }
     } catch (e) {
       console.error("Failed to load store from localStorage", e);
@@ -66,6 +183,10 @@ export function FabricazeStoreProvider({ children }: { children: React.ReactNode
       localStorage.setItem(
         STORAGE_KEY,
         JSON.stringify({
+          activeRole,
+          activeClientId,
+          activeManufacturerId,
+          clients,
           manufacturers,
           machines,
           rfqs,
@@ -77,14 +198,61 @@ export function FabricazeStoreProvider({ children }: { children: React.ReactNode
     } catch (e) {
       console.error("Failed to save store to localStorage", e);
     }
-  }, [isLoaded, manufacturers, machines, rfqs, quotations, orders, disputes]);
+  }, [
+    isLoaded,
+    activeRole,
+    activeClientId,
+    activeManufacturerId,
+    clients,
+    manufacturers,
+    machines,
+    rfqs,
+    quotations,
+    orders,
+    disputes,
+  ]);
+
+  // Derived active objects
+  const activeClient = clients.find((c) => c.id === activeClientId) || clients[0] || INITIAL_CLIENTS[0];
+  const activeManufacturer =
+    manufacturers.find((m) => m.id === activeManufacturerId) || manufacturers[0] || INITIAL_MANUFACTURERS_MULTI[0];
+
+  // Scoped lists for Multi-Tenancy
+  // Client only sees RFQs posted by their own account
+  const myRfqs = rfqs.filter((r) => !r.clientId || r.clientId === activeClient.id);
+  // Client only sees Orders belonging to their RFQs or client ID
+  const myOrders = orders.filter((o) => !o.clientId || o.clientId === activeClient.id);
+
+  // Manufacturer only sees quotes they submitted
+  const mfgSubmittedQuotes = quotations.filter((q) => q.manufacturerId === activeManufacturer.id);
+  // Manufacturer only sees orders awarded to them
+  const mfgAssignedOrders = orders.filter((o) => o.manufacturerId === activeManufacturer.id);
 
   // Actions
+  const createClient = (clientData: Partial<IClient>): IClient => {
+    const newClient: IClient = {
+      id: `cli-${Date.now()}`,
+      fullName: clientData.fullName || "New Enterprise Client",
+      companyName: clientData.companyName || "Innovations Inc",
+      email: clientData.email || `client-${Date.now()}@domain.com`,
+      phoneNumber: clientData.phoneNumber || "+91 99000 00000",
+      city: clientData.city || "Indore",
+      state: clientData.state || "Madhya Pradesh",
+      industry: clientData.industry || "General Engineering",
+      createdAt: new Date().toISOString().split("T")[0],
+    };
+    setClients((prev) => [newClient, ...prev]);
+    setActiveClientId(newClient.id);
+    return newClient;
+  };
+
   const createRfq = (rfqData: Partial<IEnquiry>): IEnquiry => {
     const code = `FAB-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
     const newRfq: IEnquiry = {
       id: `enq-${Date.now()}`,
       enquiryCode: code,
+      clientId: activeClient.id,
+      clientName: `${activeClient.fullName} (${activeClient.companyName})`,
       title: rfqData.title || "Custom Machined Part",
       description: rfqData.description || "",
       rawMaterialType: rfqData.rawMaterialType || "Aluminum 6061-T6",
@@ -114,14 +282,14 @@ export function FabricazeStoreProvider({ children }: { children: React.ReactNode
       id: `quote-${Date.now()}`,
       quoteCode,
       enquiryId: quoteData.enquiryId || "",
-      manufacturerId: quoteData.manufacturerId || "mfg-active",
-      manufacturer: quoteData.manufacturer || {
-        pseudoName: "Precision MSME #IND-4102",
-        city: "Indore, MP",
-        rating: 4.8,
-        reviewCount: 42,
-        capabilities: ["CNC Machining", "Lathe Turning", "Laser Cutting"],
-        certifications: ["ISO 9001:2015"],
+      manufacturerId: activeManufacturer.id,
+      manufacturer: {
+        pseudoName: activeManufacturer.pseudoName,
+        city: `${activeManufacturer.city}, ${activeManufacturer.state}`,
+        rating: activeManufacturer.rating,
+        reviewCount: activeManufacturer.reviewCount,
+        capabilities: activeManufacturer.capabilities,
+        certifications: activeManufacturer.certifications,
       },
       totalCostInr: quoteData.totalCostInr || 3200,
       machiningCostInr: Math.round((quoteData.totalCostInr || 3200) * 0.6),
@@ -137,7 +305,6 @@ export function FabricazeStoreProvider({ children }: { children: React.ReactNode
 
     setQuotations((prev) => [newQuote, ...prev]);
 
-    // Update parent RFQ status to QUOTED
     setRfqs((prev) =>
       prev.map((r) =>
         r.id === quoteData.enquiryId
@@ -162,6 +329,8 @@ export function FabricazeStoreProvider({ children }: { children: React.ReactNode
       id: `ord-${Date.now()}`,
       orderNumber,
       enquiryId: rfqId,
+      clientId: targetRfq?.clientId || activeClient.id,
+      manufacturerId: targetQuote?.manufacturerId || activeManufacturer.id,
       enquiryTitle: targetRfq?.title || "Custom CNC Batch",
       partSpecs: `${targetRfq?.quantity || 10} pcs • ${targetRfq?.rawMaterialType || "Alloy"} • ${targetRfq?.toleranceMm || "±0.05mm"}`,
       manufacturerPseudo: targetQuote?.manufacturer.pseudoName || "Verified MSME Partner",
@@ -178,12 +347,10 @@ export function FabricazeStoreProvider({ children }: { children: React.ReactNode
       createdAt: new Date().toISOString().split("T")[0],
     };
 
-    // Update quotation status to ACCEPTED
     setQuotations((prev) =>
       prev.map((q) => (q.id === quoteId ? { ...q, status: "ACCEPTED" as const } : q))
     );
 
-    // Update RFQ status to IN_PRODUCTION
     setRfqs((prev) =>
       prev.map((r) => (r.id === rfqId ? { ...r, status: "IN_PRODUCTION" as const } : r))
     );
@@ -213,7 +380,7 @@ export function FabricazeStoreProvider({ children }: { children: React.ReactNode
       disputeCode: code,
       orderNumber: disputeData.orderNumber || "ORD-2024-001",
       jobTitle: disputeData.jobTitle || "Custom Precision Part",
-      clientName: disputeData.clientName || "Buyer (Active Session)",
+      clientName: disputeData.clientName || activeClient.fullName,
       manufacturerPseudo: disputeData.manufacturerPseudo || "MSME Vendor",
       issueType: disputeData.issueType || "Quality Issue",
       priority: disputeData.priority || "High",
@@ -250,12 +417,13 @@ export function FabricazeStoreProvider({ children }: { children: React.ReactNode
       responseTime: "< 2 hours",
       priceRange: "₹₹",
       capabilities: mfgData.capabilities || ["CNC Machining", "Laser Cutting"],
-      certifications: mfgData.certifications || ["ISO 9001"],
+      certifications: mfgData.certifications || ["ISO 9001:2015"],
       specialties: ["Precision Machining", "Prototyping"],
       machines: [],
     };
 
     setManufacturers((prev) => [newMfg, ...prev]);
+    setActiveManufacturerId(newMfg.id);
     return newMfg;
   };
 
@@ -278,25 +446,39 @@ export function FabricazeStoreProvider({ children }: { children: React.ReactNode
   };
 
   const resetAllToZero = () => {
-    localStorage.removeItem(STORAGE_KEY);
-    setManufacturers([]);
-    setMachines(STANDARD_INDUSTRIAL_MACHINES);
     setRfqs([]);
     setQuotations([]);
     setOrders([]);
     setDisputes([]);
-    alert("Platform reset to ZERO clean state successfully! All RFQs, bids, orders, and manufacturers cleared.");
+    setClients(INITIAL_CLIENTS);
+    setManufacturers(INITIAL_MANUFACTURERS_MULTI);
+    setMachines(STANDARD_INDUSTRIAL_MACHINES);
+    localStorage.removeItem(STORAGE_KEY);
   };
 
   return (
     <FabricazeStoreContext.Provider
       value={{
+        activeRole,
+        activeClientId,
+        activeManufacturerId,
+        setActiveRole,
+        setActiveClientId,
+        setActiveManufacturerId,
+        activeClient,
+        activeManufacturer,
+        clients,
         manufacturers,
         machines,
         rfqs,
         quotations,
         orders,
         disputes,
+        myRfqs,
+        myOrders,
+        mfgSubmittedQuotes,
+        mfgAssignedOrders,
+        createClient,
         createRfq,
         submitQuotation,
         awardQuotation,

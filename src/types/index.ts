@@ -26,6 +26,18 @@ export type SurfaceFinish =
   | 'ELECTROPOLISHED'
   | 'ZINC_PLATED';
 
+export interface IClient {
+  id: string;
+  fullName: string;
+  companyName: string;
+  email: string;
+  phoneNumber: string;
+  city: string;
+  state: string;
+  industry?: string;
+  createdAt: string;
+}
+
 export interface IMachine {
   id: string;
   name: string;
@@ -87,6 +99,8 @@ export interface IQuotation {
 export interface IEnquiry {
   id: string;
   enquiryCode: string;
+  clientId?: string;
+  clientName?: string;
   title: string;
   description?: string;
   rawMaterialType: string;
@@ -110,6 +124,8 @@ export interface IOrder {
   id: string;
   orderNumber: string;
   enquiryId: string;
+  clientId?: string;
+  manufacturerId?: string;
   enquiryTitle: string;
   partSpecs: string;
   manufacturerPseudo: string;

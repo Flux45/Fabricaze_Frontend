@@ -21,7 +21,13 @@ import { useFabricazeStore } from "@/lib/fabricazeStore";
 import { IEnquiry } from "@/types";
 
 export default function ManufacturerDashboard() {
-  const { rfqs, quotations, orders, submitQuotation } = useFabricazeStore();
+  const {
+    rfqs,
+    mfgSubmittedQuotes,
+    mfgAssignedOrders,
+    submitQuotation,
+    activeManufacturer,
+  } = useFabricazeStore();
 
   const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(false);
   const [selectedRfq, setSelectedRfq] = useState<IEnquiry | null>(null);
@@ -29,7 +35,7 @@ export default function ManufacturerDashboard() {
   const [quoteForm, setQuoteForm] = useState({
     totalCost: 3200,
     leadTimeDays: 7,
-    notes: "Can machine on our Haas VMC holding ±0.05 mm tolerance. CMM and material inspection report included.",
+    notes: `Can machine on our CNC centers holding ±0.05 mm tolerance. CMM and material inspection report included.`,
   });
 
   const [lastSubmittedQuoteCode, setLastSubmittedQuoteCode] = useState<string | null>(null);
@@ -53,14 +59,6 @@ export default function ManufacturerDashboard() {
       totalCostInr: quoteForm.totalCost,
       leadTimeDays: quoteForm.leadTimeDays,
       notes: quoteForm.notes,
-      manufacturer: {
-        pseudoName: "Precision MSME #IND-4102",
-        city: "Indore, MP",
-        rating: 4.8,
-        reviewCount: 42,
-        capabilities: ["CNC Machining", "Laser Cutting", "Surface Grinding"],
-        certifications: ["ISO 9001:2015"],
-      },
     });
 
     setLastSubmittedQuoteCode(quote.quoteCode);
@@ -141,23 +139,23 @@ export default function ManufacturerDashboard() {
           </div>
 
           <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-2xs">
-            <span className="text-xs text-gray-500 font-semibold block">Active Bids Submitted</span>
-            <div className="text-2xl font-extrabold text-amber-600 mt-1">{quotations.length}</div>
-            <span className="text-[11px] text-gray-400 block mt-0.5">Pending buyer review</span>
+            <span className="text-xs text-gray-500 font-semibold block">My Submitted Bids</span>
+            <div className="text-2xl font-extrabold text-amber-600 mt-1">{mfgSubmittedQuotes.length}</div>
+            <span className="text-[11px] text-gray-400 block mt-0.5">By this MSME facility</span>
           </div>
 
           <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-2xs">
-            <span className="text-xs text-gray-500 font-semibold block">In-Production Orders</span>
-            <div className="text-2xl font-extrabold text-emerald-600 mt-1">{orders.length}</div>
-            <span className="text-[11px] text-gray-400 block mt-0.5">Under milestone progress</span>
+            <span className="text-xs text-gray-500 font-semibold block">My Awarded Orders</span>
+            <div className="text-2xl font-extrabold text-emerald-600 mt-1">{mfgAssignedOrders.length}</div>
+            <span className="text-[11px] text-gray-400 block mt-0.5">Under shop production</span>
           </div>
 
           <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-2xs">
-            <span className="text-xs text-gray-500 font-semibold block">Escrow Secured Funds</span>
+            <span className="text-xs text-gray-500 font-semibold block">Escrow Secured Value</span>
             <div className="text-2xl font-extrabold text-slate-900 mt-1">
-              ₹{orders.reduce((sum, o) => sum + o.totalAmountInr, 0).toLocaleString()}
+              ₹{mfgAssignedOrders.reduce((sum, o) => sum + o.totalAmountInr, 0).toLocaleString()}
             </div>
-            <span className="text-[11px] text-emerald-600 font-semibold block mt-0.5">Protected escrow</span>
+            <span className="text-[11px] text-emerald-600 font-semibold block mt-0.5">Disbursed on delivery</span>
           </div>
         </div>
 
@@ -199,7 +197,7 @@ export default function ManufacturerDashboard() {
           ) : (
             <div className="space-y-4">
               {rfqs.map((rfq) => {
-                const hasQuoted = quotations.some((q) => q.enquiryId === rfq.id);
+                const hasQuoted = mfgSubmittedQuotes.some((q) => q.enquiryId === rfq.id);
                 return (
                   <div
                     key={rfq.id}
