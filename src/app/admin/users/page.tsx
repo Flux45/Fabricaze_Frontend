@@ -1,12 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Download, CheckCircle, Clock, AlertCircle, MoreVertical } from "lucide-react";
+import {
+  Search,
+  Download,
+  CheckCircle,
+  Clock,
+  Plus,
+  X,
+  Factory,
+  Building2,
+  Mail,
+  Phone,
+  MapPin,
+  ShieldCheck,
+  Check,
+} from "lucide-react";
 
 export default function AdminUsersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("All Roles");
   const [statusFilter, setStatusFilter] = useState("All Statuses");
+  const [isOnboardModalOpen, setIsOnboardModalOpen] = useState(false);
 
   const [users, setUsers] = useState([
     {
@@ -51,10 +66,58 @@ export default function AdminUsersPage() {
     },
   ]);
 
+  const [formData, setFormData] = useState({
+    companyName: "",
+    contactPerson: "",
+    email: "",
+    phoneNumber: "",
+    city: "Indore",
+    state: "Madhya Pradesh",
+    gstNumber: "",
+    capabilities: ["CNC Machining"],
+    certifications: ["ISO 9001"],
+    verificationStatus: "Verified",
+  });
+
   const toggleVerify = (id: string) => {
     setUsers((prev) =>
-      prev.map((u) => (u.id === id ? { ...u, status: u.status === "Verified" ? "Active" : "Verified" } : u))
+      prev.map((u) =>
+        u.id === id ? { ...u, status: u.status === "Verified" ? "Pending" : "Verified" } : u
+      )
     );
+  };
+
+  const handleOnboardSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newId = `USR-00${users.length + 1}`;
+    const newUser = {
+      id: newId,
+      name: formData.companyName,
+      email: formData.email,
+      role: "Manufacturer",
+      status: formData.verificationStatus,
+      location: `${formData.city}, ${formData.state === "Madhya Pradesh" ? "MP" : formData.state === "Maharashtra" ? "MH" : "GJ"}`,
+      joinDate: new Date().toISOString().split("T")[0],
+      activity: "0 jobs completed (New Onboarding)",
+    };
+
+    setUsers([newUser, ...users]);
+    setIsOnboardModalOpen(false);
+    alert(`MSME Manufacturer "${formData.companyName}" successfully onboarded with verified status!`);
+
+    // Reset form
+    setFormData({
+      companyName: "",
+      contactPerson: "",
+      email: "",
+      phoneNumber: "",
+      city: "Indore",
+      state: "Madhya Pradesh",
+      gstNumber: "",
+      capabilities: ["CNC Machining"],
+      certifications: ["ISO 9001"],
+      verificationStatus: "Verified",
+    });
   };
 
   const filteredUsers = users.filter((u) => {
@@ -71,7 +134,7 @@ export default function AdminUsersPage() {
 
   return (
     <div className="p-6 sm:p-8 space-y-6">
-      {/* Header matching Page 18 mockup */}
+      {/* Header matching Page 18 mockup + "+ Onboard New Manufacturer" CTA */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">User Management</h1>
@@ -79,13 +142,24 @@ export default function AdminUsersPage() {
             Audit client accounts, MSME factory credentials, and verification statuses
           </p>
         </div>
-        <button
-          onClick={() => alert("Exporting all user records to CSV...")}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-2xs transition"
-        >
-          <Download className="w-3.5 h-3.5" />
-          <span>Export Users</span>
-        </button>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsOnboardModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-md shadow-blue-500/20 transition active:scale-98"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Onboard New Manufacturer</span>
+          </button>
+
+          <button
+            onClick={() => alert("Exporting all user records to CSV...")}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-gray-300 hover:bg-gray-50 text-slate-700 text-xs font-semibold shadow-2xs transition"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Export Users</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter and Search Bar matching mockup */}
@@ -187,9 +261,13 @@ export default function AdminUsersPage() {
                   <td className="px-6 py-4 text-right">
                     <button
                       onClick={() => toggleVerify(user.id)}
-                      className="px-2.5 py-1 text-[11px] font-semibold rounded bg-gray-100 hover:bg-gray-200 text-gray-700 transition"
+                      className={`px-2.5 py-1 text-[11px] font-semibold rounded transition ${
+                        user.status === "Verified"
+                          ? "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                          : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                      }`}
                     >
-                      {user.status === "Verified" ? "Revoke" : "Verify MSME"}
+                      {user.status === "Verified" ? "Revoke" : "Approve MSME"}
                     </button>
                   </td>
                 </tr>
@@ -198,6 +276,173 @@ export default function AdminUsersPage() {
           </table>
         </div>
       </div>
+
+      {/* Onboard New Manufacturer Modal */}
+      {isOnboardModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 space-y-5 border border-gray-200 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                  <Factory className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-base">Onboard New MSME Manufacturer</h3>
+                  <p className="text-xs text-slate-500">Register facility credentials, GSTIN, and machine capabilities</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsOnboardModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleOnboardSubmit} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Company / Facility Name</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Malwa Precision Engineering"
+                    value={formData.companyName}
+                    onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                    className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Contact Person</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Anand Sharma"
+                    value={formData.contactPerson}
+                    onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
+                    className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Work Email</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="contact@malwaprecision.com"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Phone Number</label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="+91-9826012345"
+                    value={formData.phoneNumber}
+                    onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                    className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Manufacturing Hub</label>
+                  <select
+                    value={formData.city}
+                    onChange={(e) => {
+                      const c = e.target.value;
+                      let s = "Madhya Pradesh";
+                      if (c === "Pune") s = "Maharashtra";
+                      else if (c === "Ahmedabad") s = "Gujarat";
+                      else if (c === "Bengaluru") s = "Karnataka";
+                      setFormData({ ...formData, city: c, state: s });
+                    }}
+                    className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-2.5 focus:ring-2 focus:ring-blue-500 font-medium"
+                  >
+                    <option>Indore</option>
+                    <option>Pune</option>
+                    <option>Ahmedabad</option>
+                    <option>Bengaluru</option>
+                  </select>
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    GSTIN / Udyam Registration Number
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="23AAECM1234F1Z9 or UDYAM-MP-23-009182"
+                    value={formData.gstNumber}
+                    onChange={(e) => setFormData({ ...formData, gstNumber: e.target.value })}
+                    className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  Primary Machining Capabilities
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {["CNC Machining", "5-Axis CNC", "Laser Cutting", "Sheet Metal", "3D Printing", "Heat Treatment"].map(
+                    (cap) => (
+                      <label key={cap} className="flex items-center gap-1.5 p-2 rounded-lg bg-gray-50 border border-gray-200 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.capabilities.includes(cap)}
+                          onChange={() => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              capabilities: prev.capabilities.includes(cap)
+                                ? prev.capabilities.filter((c) => c !== cap)
+                                : [...prev.capabilities, cap],
+                            }));
+                          }}
+                          className="rounded text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
+                        />
+                        <span className="text-[11px] font-medium text-slate-800">{cap}</span>
+                      </label>
+                    )
+                  )}
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-100 text-blue-900 text-[11px] flex items-start gap-2">
+                <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                <p>
+                  Anonymized pseudo-name identifier (e.g. <strong>{formData.companyName || "Vendor"} #{formData.city.slice(0, 3).toUpperCase()}-4821</strong>) will be auto-generated to protect the platform from client bypass.
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition"
+                >
+                  Onboard & Activate Manufacturer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsOnboardModalOpen(false)}
+                  className="px-5 py-3 rounded-xl border border-gray-300 text-slate-700 font-semibold text-xs hover:bg-gray-50 transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
