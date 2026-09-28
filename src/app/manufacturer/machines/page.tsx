@@ -2,35 +2,16 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Wrench, Plus, CheckCircle2, Trash2, Power, X, Layers } from "lucide-react";
+import { Wrench, Plus, CheckCircle2, Power, X, Layers, Activity, Cpu, ShieldCheck } from "lucide-react";
+import { useFabricazeStore } from "@/lib/fabricazeStore";
 import { IMachine } from "@/types";
 
 export default function ManufacturerMachinesPage() {
-  const [machines, setMachines] = useState<IMachine[]>([
-    {
-      id: "mac-01",
-      name: "Haas VF-2SS 3-Axis VMC",
-      machineType: "CNC Milling",
-      xAxisMm: 762,
-      yAxisMm: 406,
-      zAxisMm: 508,
-      hourlyRateInr: 1200,
-      isActive: true,
-      supportedMaterials: ["Aluminum 6061-T6", "SS 304", "Brass C360"],
-    },
-    {
-      id: "mac-02",
-      name: "Mazak Quick Turn 250MSY CNC Lathe",
-      machineType: "CNC Turning",
-      xAxisMm: 230,
-      zAxisMm: 575,
-      hourlyRateInr: 950,
-      isActive: true,
-      supportedMaterials: ["Mild Steel EN8", "Aluminum 7075", "Delrin POM"],
-    },
-  ]);
-
+  const { machines, addMachine } = useFabricazeStore();
+  const [activeMachines, setActiveMachines] = useState<IMachine[]>(machines);
+  const [filterType, setFilterType] = useState("All");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
   const [newMachine, setNewMachine] = useState({
     name: "",
     machineType: "CNC Milling",
@@ -38,35 +19,43 @@ export default function ManufacturerMachinesPage() {
     yAxisMm: 500,
     zAxisMm: 500,
     hourlyRateInr: 1500,
-    supportedMaterials: "Aluminum 6061, Stainless Steel",
+    supportedMaterials: "Aluminum 6061, Stainless Steel, Brass",
   });
 
-  const toggleStatus = (id: string) => {
-    setMachines((prev) =>
+  const machineTypes = [
+    "All",
+    "CNC Lathe / Turning",
+    "Engine Lathe",
+    "CNC Milling (VMC)",
+    "5-Axis CNC",
+    "Turret Milling Machine",
+    "Fiber Laser Cutting",
+    "CNC Press Brake",
+    "Metal 3D Printing (DMLS)",
+  ];
+
+  const handleToggleStatus = (id: string) => {
+    setActiveMachines((prev) =>
       prev.map((m) => (m.id === id ? { ...m, isActive: !m.isActive } : m))
     );
   };
 
-  const deleteMachine = (id: string) => {
-    if (confirm("Are you sure you want to remove this machine from your active fleet?")) {
-      setMachines((prev) => prev.filter((m) => m.id !== id));
-    }
-  };
-
   const handleAddMachine = (e: React.FormEvent) => {
     e.preventDefault();
-    const created: IMachine = {
-      id: `mac-${Date.now()}`,
+    if (!newMachine.name.trim()) return;
+
+    const created = addMachine({
       name: newMachine.name,
       machineType: newMachine.machineType,
       xAxisMm: newMachine.xAxisMm,
       yAxisMm: newMachine.yAxisMm,
       zAxisMm: newMachine.zAxisMm,
+      maxPartSizeMm: Math.max(newMachine.xAxisMm, newMachine.yAxisMm, newMachine.zAxisMm),
       hourlyRateInr: newMachine.hourlyRateInr,
-      isActive: true,
       supportedMaterials: newMachine.supportedMaterials.split(",").map((s) => s.trim()),
-    };
-    setMachines([...machines, created]);
+    });
+
+    setActiveMachines((prev) => [created, ...prev]);
     setIsAddModalOpen(false);
     setNewMachine({
       name: "",
@@ -75,9 +64,16 @@ export default function ManufacturerMachinesPage() {
       yAxisMm: 500,
       zAxisMm: 500,
       hourlyRateInr: 1500,
-      supportedMaterials: "Aluminum 6061, Stainless Steel",
+      supportedMaterials: "Aluminum 6061, Stainless Steel, Brass",
     });
   };
+
+  const displayList = activeMachines.length > 0 ? activeMachines : machines;
+
+  const filteredMachines = displayList.filter((m) => {
+    if (filterType === "All") return true;
+    return m.machineType.toLowerCase().includes(filterType.toLowerCase());
+  });
 
   return (
     <div className="bg-slate-50 min-h-screen py-8">
@@ -89,103 +85,125 @@ export default function ManufacturerMachinesPage() {
               Capacity & Tooling
             </span>
             <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mt-0.5">
-              Machine Fleet & Operational Capacity
+              Industrial Machine Fleet & Specifications
             </h1>
             <p className="text-xs text-slate-500">
-              Register CNC centers, working envelope travels, and hourly shop rates to receive matched RFQs automatically.
+              Standard real-world industrial machinery specs (Lathe, Milling, 5-Axis, Fiber Laser, Press Brake, Metal 3D Printing).
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-2xs transition"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition shadow-2xs"
             >
               <Plus className="w-4 h-4" />
-              <span>Register New Machine</span>
+              <span>Add Custom Machine</span>
             </button>
           </div>
         </div>
 
-        {/* Machine Cards List */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {machines.map((machine) => (
-            <div
-              key={machine.id}
-              className={`bg-white rounded-2xl p-6 border shadow-2xs space-y-4 transition ${
-                machine.isActive ? "border-gray-200" : "border-gray-200 opacity-60 bg-gray-50"
+        {/* Filter bar */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 text-xs">
+          {machineTypes.map((type) => (
+            <button
+              key={type}
+              onClick={() => setFilterType(type)}
+              className={`px-3 py-1.5 rounded-xl font-semibold shrink-0 transition ${
+                filterType === type
+                  ? "bg-slate-900 text-white shadow-2xs"
+                  : "bg-white text-slate-600 border border-gray-200 hover:bg-gray-50"
               }`}
             >
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-slate-900 text-base">{machine.name}</h3>
-                    <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        machine.isActive
-                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                          : "bg-gray-100 text-gray-500 border border-gray-200"
-                      }`}
-                    >
-                      {machine.isActive ? "Active / Idle Spindle" : "Offline / Maintenance"}
-                    </span>
-                  </div>
-                  <span className="text-xs text-blue-600 font-semibold">{machine.machineType}</span>
-                </div>
+              {type}
+            </button>
+          ))}
+        </div>
 
-                <div className="flex items-center gap-2">
+        {/* Machine Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredMachines.map((m) => (
+            <div
+              key={m.id}
+              className={`bg-white rounded-2xl p-6 border transition flex flex-col justify-between shadow-2xs ${
+                m.isActive ? "border-gray-200 hover:border-gray-300" : "border-gray-200 opacity-60 bg-gray-50"
+              }`}
+            >
+              <div className="space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                      {m.machineType}
+                    </span>
+                    <h3 className="font-bold text-slate-900 text-base mt-1.5 leading-snug">{m.name}</h3>
+                  </div>
                   <button
-                    onClick={() => toggleStatus(machine.id)}
-                    className={`p-2 rounded-xl border text-xs transition ${
-                      machine.isActive
-                        ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                        : "bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200"
+                    onClick={() => handleToggleStatus(m.id)}
+                    title={m.isActive ? "Mark machine offline" : "Mark machine active"}
+                    className={`p-1.5 rounded-lg border transition ${
+                      m.isActive
+                        ? "text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100"
+                        : "text-gray-400 bg-gray-100 border-gray-200 hover:bg-gray-200"
                     }`}
-                    title="Toggle Machine Status"
                   >
                     <Power className="w-4 h-4" />
                   </button>
-                  <button
-                    onClick={() => deleteMachine(machine.id)}
-                    className="p-2 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 transition"
-                    title="Delete Machine"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
                 </div>
-              </div>
 
-              {/* Envelope Specifications */}
-              <div className="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl border border-gray-100 text-xs">
-                <div>
-                  <span className="text-gray-400 block text-[10px] uppercase">X-Travel</span>
-                  <span className="font-bold text-slate-800">{machine.xAxisMm} mm</span>
+                {/* Working Envelope */}
+                <div className="bg-slate-50 rounded-xl p-3 border border-gray-100 text-xs space-y-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
+                    Working Envelope & Travels
+                  </span>
+                  <div className="grid grid-cols-3 gap-2 font-mono text-slate-800">
+                    <div>
+                      <span className="text-gray-400 block text-[9px]">X-Axis</span>
+                      <span className="font-bold">{m.xAxisMm} mm</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[9px]">Y-Axis</span>
+                      <span className="font-bold">{m.yAxisMm ? `${m.yAxisMm} mm` : "—"}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[9px]">Z-Axis</span>
+                      <span className="font-bold">{m.zAxisMm} mm</span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-gray-400 block text-[10px] uppercase">Y-Travel</span>
-                  <span className="font-bold text-slate-800">{machine.yAxisMm || "-"} mm</span>
-                </div>
-                <div>
-                  <span className="text-gray-400 block text-[10px] uppercase">Z-Travel</span>
-                  <span className="font-bold text-slate-800">{machine.zAxisMm} mm</span>
-                </div>
-              </div>
 
-              {/* Hourly rate & materials */}
-              <div className="text-xs space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Shop Hourly Rate:</span>
-                  <span className="font-extrabold text-blue-600">₹{machine.hourlyRateInr?.toLocaleString()}/hr</span>
-                </div>
+                {/* Materials */}
                 <div>
-                  <span className="text-gray-500 block mb-1">Supported Materials:</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1.5">
+                    Supported Raw Materials
+                  </span>
                   <div className="flex flex-wrap gap-1">
-                    {machine.supportedMaterials.map((mat) => (
-                      <span key={mat} className="px-2 py-0.5 rounded text-[10px] bg-gray-100 text-gray-700">
+                    {(m.supportedMaterials || []).map((mat) => (
+                      <span
+                        key={mat}
+                        className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-medium"
+                      >
                         {mat}
                       </span>
                     ))}
                   </div>
+                </div>
+              </div>
+
+              {/* Bottom Row */}
+              <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-gray-400 block text-[10px] uppercase font-semibold">Shop Spindle Rate</span>
+                  <span className="font-extrabold text-slate-900 text-base">₹{(m.hourlyRateInr || 1200).toLocaleString()}/hr</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      m.isActive ? "bg-emerald-500 animate-pulse" : "bg-gray-300"
+                    }`}
+                  />
+                  <span className="text-[11px] font-semibold text-gray-600">
+                    {m.isActive ? "Spindle Available" : "Maintenance / Idle"}
+                  </span>
                 </div>
               </div>
             </div>
@@ -194,95 +212,99 @@ export default function ManufacturerMachinesPage() {
 
         {/* Add Machine Modal */}
         {isAddModalOpen && (
-          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 border border-gray-200 shadow-2xl">
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 border border-gray-200 shadow-2xl space-y-4">
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <h3 className="font-bold text-slate-900 text-base">Register Machine to Fleet</h3>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
+                    <Wrench className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-sm">Add Shop Machine Tool</h3>
+                    <span className="text-[10px] text-gray-500">Expands RFQ matching coverage</span>
+                  </div>
+                </div>
                 <button onClick={() => setIsAddModalOpen(false)} className="text-gray-400 hover:text-gray-600">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <form onSubmit={handleAddMachine} className="space-y-4 text-xs">
+              <form onSubmit={handleAddMachine} className="space-y-3 text-xs">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Machine Name / Model</label>
+                  <label className="block text-slate-700 font-semibold mb-1">Make & Model</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Haas VF-4 4-Axis VMC"
                     value={newMachine.name}
                     onChange={(e) => setNewMachine({ ...newMachine, name: e.target.value })}
-                    className="w-full text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g. DMG Mori NVX 5080 II"
+                    className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">Type</label>
-                    <select
-                      value={newMachine.machineType}
-                      onChange={(e) => setNewMachine({ ...newMachine, machineType: e.target.value })}
-                      className="w-full text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option>CNC Milling</option>
-                      <option>CNC Turning</option>
-                      <option>5-Axis CNC</option>
-                      <option>Laser Cutting</option>
-                      <option>Sheet Metal Press</option>
-                      <option>3D Printer</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">Hourly Rate (INR)</label>
-                    <input
-                      type="number"
-                      required
-                      value={newMachine.hourlyRateInr}
-                      onChange={(e) => setNewMachine({ ...newMachine, hourlyRateInr: parseInt(e.target.value) || 0 })}
-                      className="w-full text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">Machining Category</label>
+                  <select
+                    value={newMachine.machineType}
+                    onChange={(e) => setNewMachine({ ...newMachine, machineType: e.target.value })}
+                    className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option>CNC Milling</option>
+                    <option>CNC Turning</option>
+                    <option>5-Axis CNC</option>
+                    <option>Fiber Laser Cutting</option>
+                    <option>Press Brake</option>
+                    <option>Direct Metal 3D Printing</option>
+                  </select>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-2">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">X-Travel (mm)</label>
+                    <label className="block text-slate-700 font-semibold mb-1">X Travel (mm)</label>
                     <input
                       type="number"
                       value={newMachine.xAxisMm}
-                      onChange={(e) => setNewMachine({ ...newMachine, xAxisMm: parseInt(e.target.value) || 0 })}
-                      className="w-full text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                      onChange={(e) => setNewMachine({ ...newMachine, xAxisMm: Number(e.target.value) })}
+                      className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">Y-Travel (mm)</label>
+                    <label className="block text-slate-700 font-semibold mb-1">Y Travel (mm)</label>
                     <input
                       type="number"
                       value={newMachine.yAxisMm}
-                      onChange={(e) => setNewMachine({ ...newMachine, yAxisMm: parseInt(e.target.value) || 0 })}
-                      className="w-full text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                      onChange={(e) => setNewMachine({ ...newMachine, yAxisMm: Number(e.target.value) })}
+                      className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">Z-Travel (mm)</label>
+                    <label className="block text-slate-700 font-semibold mb-1">Z Travel (mm)</label>
                     <input
                       type="number"
                       value={newMachine.zAxisMm}
-                      onChange={(e) => setNewMachine({ ...newMachine, zAxisMm: parseInt(e.target.value) || 0 })}
-                      className="w-full text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                      onChange={(e) => setNewMachine({ ...newMachine, zAxisMm: Number(e.target.value) })}
+                      className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Supported Materials (Comma separated)
-                  </label>
+                  <label className="block text-slate-700 font-semibold mb-1">Hourly Spindle Rate (₹/hr)</label>
+                  <input
+                    type="number"
+                    value={newMachine.hourlyRateInr}
+                    onChange={(e) => setNewMachine({ ...newMachine, hourlyRateInr: Number(e.target.value) })}
+                    className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">Supported Materials (comma separated)</label>
                   <input
                     type="text"
                     value={newMachine.supportedMaterials}
                     onChange={(e) => setNewMachine({ ...newMachine, supportedMaterials: e.target.value })}
-                    className="w-full text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-blue-500"
+                    className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
@@ -296,7 +318,7 @@ export default function ManufacturerMachinesPage() {
                   <button
                     type="button"
                     onClick={() => setIsAddModalOpen(false)}
-                    className="px-4 py-2.5 rounded-xl border border-gray-300 text-slate-700 font-semibold text-xs hover:bg-gray-50 transition"
+                    className="px-4 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-semibold text-xs hover:bg-gray-50 transition"
                   >
                     Cancel
                   </button>

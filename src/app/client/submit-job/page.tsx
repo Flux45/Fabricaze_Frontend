@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   UploadCloud,
   FileText,
@@ -13,18 +14,23 @@ import {
   MapPin,
   Sparkles,
 } from "lucide-react";
+import { useFabricazeStore } from "@/lib/fabricazeStore";
 
 export default function SubmitJobPage() {
+  const router = useRouter();
+  const { createRfq } = useFabricazeStore();
+
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [title, setTitle] = useState("Custom CNC Aluminum Housing");
   const [material, setMaterial] = useState("Aluminum 6061-T6");
   const [process, setProcess] = useState("CNC Machining");
   const [quantity, setQuantity] = useState(10);
-  const [tolerance, setTolerance] = useState("±0.1 mm");
+  const [tolerance, setTolerance] = useState("±0.05 mm");
   const [surfaceFinish, setSurfaceFinish] = useState("As-Machined");
   const [deliveryDate, setDeliveryDate] = useState("2026-10-15");
   const [instructions, setInstructions] = useState("");
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [createdRfqCode, setCreatedRfqCode] = useState<string | null>(null);
 
   // Dynamic cost calculation based on selected parameters
   const calculateEstimate = () => {
@@ -81,20 +87,34 @@ export default function SubmitJobPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitted(true);
+    const newRfq = createRfq({
+      title,
+      description: instructions,
+      rawMaterialType: material,
+      processType: "CNC_MACHINING",
+      surfaceFinish: "AS_MACHINED",
+      toleranceMm: tolerance,
+      quantity,
+      requiredDeliveryDate: deliveryDate,
+      fileName: selectedFile ? selectedFile.name : "housing_cad_rev1.step",
+      estimatedBudgetMin: minEst,
+      estimatedBudgetMax: maxEst,
+    });
+
+    setCreatedRfqCode(newRfq.enquiryCode);
   };
 
   return (
     <div className="bg-slate-50 min-h-screen py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Navigation Breadcrumb / Tab Bar matching mockup */}
+        {/* Navigation Breadcrumb / Tab Bar */}
         <div className="flex items-center justify-between border-b border-gray-200 pb-4 mb-8">
           <div>
             <span className="text-xs font-semibold uppercase tracking-wider text-blue-600">
-              Manufacturing Marketplace
+              Buyer Portal • Step 1
             </span>
             <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-              Submit Custom Manufacturing RFQ
+              Post CAD Manufacturing RFQ
             </h1>
           </div>
           <div className="flex items-center gap-3">
@@ -102,37 +122,53 @@ export default function SubmitJobPage() {
               href="/client/bids"
               className="text-xs font-semibold text-blue-600 hover:text-blue-700 bg-white border border-gray-200 px-3 py-1.5 rounded-lg shadow-2xs"
             >
-              View Active Bids (4)
+              View Active Bids
             </Link>
           </div>
         </div>
 
-        {isSubmitted ? (
-          <div className="max-w-2xl mx-auto bg-white rounded-2xl p-8 border border-gray-200 text-center space-y-4 shadow-sm">
-            <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 mx-auto flex items-center justify-center">
+        {createdRfqCode ? (
+          <div className="max-w-2xl mx-auto bg-white rounded-3xl p-8 border border-gray-200 text-center space-y-5 shadow-xl">
+            <div className="w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-600 mx-auto flex items-center justify-center">
               <CheckCircle2 className="w-10 h-10" />
             </div>
-            <h2 className="text-2xl font-bold text-slate-900">RFQ Broadcasted Successfully!</h2>
-            <p className="text-sm text-slate-600">
-              Job <strong>#FAB-2024-001</strong> has been dispatched to verified machine shops across <strong>Indore, Pune, and Ahmedabad</strong> matching your machine tolerances and material specs.
-            </p>
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-left text-xs text-blue-900 space-y-1">
-              <div>• Expected Quoting Window: <strong>24–48 hours</strong></div>
-              <div>• Target Batch: <strong>{quantity} units</strong> ({material})</div>
-              <div>• Disintermediation Protection: <strong>Vendor pseudonyms active</strong></div>
+            <div className="space-y-1">
+              <h2 className="text-2xl font-extrabold text-slate-900">
+                Inquiry Posted Successfully!
+              </h2>
+              <p className="text-xs text-slate-500">
+                Job Code: <strong className="text-blue-600 font-bold">{createdRfqCode}</strong>
+              </p>
             </div>
-            <div className="pt-4 flex justify-center gap-4">
-              <Link
-                href="/client/bids"
-                className="px-6 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition"
-              >
-                Go to Bids Comparison
-              </Link>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Your CAD drawing for <strong>{quantity} pcs ({material})</strong> is now broadcasted to the manufacturer marketplace!
+            </p>
+
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl p-5 text-left text-xs text-blue-950 space-y-2">
+              <div className="font-bold flex items-center gap-2 text-sm text-blue-900">
+                <Sparkles className="w-4 h-4 text-blue-600" />
+                Next Step in Testing Flow:
+              </div>
+              <p className="text-slate-700">
+                Now switch to the <strong>Manufacturer Hub</strong> to act as an MSME machine shop and submit a competitive bid against this job!
+              </p>
+              <div className="pt-2">
+                <Link
+                  href="/manufacturer/dashboard"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-md transition"
+                >
+                  <span>Go to Manufacturer Hub & Submit Bid</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-center gap-4">
               <button
-                onClick={() => setIsSubmitted(false)}
-                className="px-6 py-2.5 rounded-xl bg-white border border-gray-300 text-slate-700 font-semibold text-sm hover:bg-gray-50 transition"
+                onClick={() => setCreatedRfqCode(null)}
+                className="px-5 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold transition"
               >
-                Submit Another Part
+                Post Another Inquiry
               </button>
             </div>
           </div>
@@ -140,12 +176,27 @@ export default function SubmitJobPage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* Left Form: CAD Upload & Material Specs (Cols 1-7) */}
             <form onSubmit={handleSubmit} className="lg:col-span-7 space-y-6">
+              {/* Job Title */}
+              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-2xs space-y-2">
+                <label className="block text-xs font-bold text-slate-900">
+                  Job / Part Title
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="e.g. Precision CNC Aluminum Housing"
+                  className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-500 font-semibold text-slate-900"
+                />
+              </div>
+
               {/* CAD Upload Card */}
               <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-2xs">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                     <UploadCloud className="w-4 h-4 text-blue-600" />
-                    Upload CAD Files & Drawings
+                    Upload CAD Files & 2D Drawings
                   </h2>
                   <span className="text-[11px] text-gray-500">Confidential NDA Protected</span>
                 </div>
@@ -165,10 +216,10 @@ export default function SubmitJobPage() {
                     <UploadCloud className="w-6 h-6" />
                   </div>
                   <p className="text-sm font-semibold text-slate-800">
-                    {selectedFile ? selectedFile.name : "Drop your CAD files here"}
+                    {selectedFile ? selectedFile.name : "Drop your CAD drawing here (.step, .dwg, .stl, .pdf)"}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
-                    Supports .dwg, .step, .iges, .stl, .pdf (Max 50MB)
+                    Or click browse to upload from your computer
                   </p>
 
                   <div className="mt-4">
@@ -254,7 +305,7 @@ export default function SubmitJobPage() {
                       type="text"
                       value={tolerance}
                       onChange={(e) => setTolerance(e.target.value)}
-                      placeholder="e.g. ±0.1 mm"
+                      placeholder="e.g. ±0.05 mm"
                       className="w-full text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                     />
                   </div>
@@ -307,7 +358,7 @@ export default function SubmitJobPage() {
                     rows={3}
                     value={instructions}
                     onChange={(e) => setInstructions(e.target.value)}
-                    placeholder="Any specific tolerances, quality standards, or delivery instructions (e.g. CMM inspection report required, HT certificate required)..."
+                    placeholder="Specific tolerances, CMM inspection requirement, material test sheets..."
                     className="w-full text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                   />
                 </div>
@@ -318,19 +369,18 @@ export default function SubmitJobPage() {
                 type="submit"
                 className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-500/20 active:scale-[0.99] transition cursor-pointer"
               >
-                <span>Request Quotes from Verified MSMEs</span>
+                <span>Broadcast Inquiry to Marketplace</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
 
-            {/* Right Side: Project Summary & Tips (Cols 8-12) matching mockup */}
+            {/* Right Side: Project Summary */}
             <div className="lg:col-span-5 space-y-6">
-              {/* Project Summary Card */}
-              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-2xs space-y-6">
+              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-2xs space-y-6 sticky top-24">
                 <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                   <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-blue-600" />
-                    Project Summary
+                    Live Project Summary
                   </h3>
                   <span className="text-[10px] uppercase font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
                     Instant Preview
@@ -340,13 +390,13 @@ export default function SubmitJobPage() {
                 {/* Quick Estimate Banner */}
                 <div className="bg-blue-50/80 rounded-xl p-4 border border-blue-100">
                   <span className="text-[11px] font-semibold text-blue-800 uppercase tracking-wider block">
-                    Quick Estimate
+                    Quick Estimate Range
                   </span>
                   <div className="text-2xl font-extrabold text-blue-900 tracking-tight mt-0.5">
                     ₹{minEst.toLocaleString()} – ₹{maxEst.toLocaleString()}
                   </div>
                   <span className="text-[11px] text-blue-700/80 block mt-1">
-                    Based on similar projects in network
+                    Based on market spindle rates
                   </span>
                 </div>
 
@@ -365,55 +415,22 @@ export default function SubmitJobPage() {
                     <span className="font-semibold text-slate-800">{quantity} pieces</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b border-gray-100">
-                    <span className="text-gray-500">Est. Lead Time:</span>
-                    <span className="font-semibold text-slate-800">5–12 days</span>
+                    <span className="text-gray-500">Tolerance:</span>
+                    <span className="font-semibold text-slate-800">{tolerance}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b border-gray-100">
+                    <span className="text-gray-500">Target Delivery:</span>
+                    <span className="font-semibold text-slate-800">{deliveryDate}</span>
                   </div>
                 </div>
 
-                {/* Recommended Manufacturers Hubs */}
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2.5">
-                    Recommended Manufacturers
-                  </h4>
-                  <ul className="space-y-1.5 text-xs text-slate-600">
-                    <li className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-                      <span><strong>3 manufacturers</strong> in Indore (Pologround)</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-                      <span><strong>5 manufacturers</strong> in Pune (Bhosari / Chakan)</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-                      <span><strong>2 manufacturers</strong> in Ahmedabad (Naroda GIDC)</span>
-                    </li>
-                  </ul>
-                </div>
-
-                {/* Tips for Better Quotes */}
-                <div className="pt-4 border-t border-gray-100">
-                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2.5">
-                    Tips for Better Quotes
-                  </h4>
-                  <ul className="space-y-2 text-xs text-slate-500">
-                    <li className="flex items-start gap-1.5">
-                      <span className="text-blue-600">•</span>
-                      <span>Include detailed technical drawings with critical dimensions.</span>
-                    </li>
-                    <li className="flex items-start gap-1.5">
-                      <span className="text-blue-600">•</span>
-                      <span>Specify material grade and certification requirements (HT, MT).</span>
-                    </li>
-                    <li className="flex items-start gap-1.5">
-                      <span className="text-blue-600">•</span>
-                      <span>Provide clear tolerance and quality standards.</span>
-                    </li>
-                    <li className="flex items-start gap-1.5">
-                      <span className="text-blue-600">•</span>
-                      <span>Consider flexible delivery dates for better volume pricing.</span>
-                    </li>
-                  </ul>
+                <div className="pt-2 text-xs text-gray-500 space-y-1.5">
+                  <div className="font-bold text-slate-800 uppercase tracking-wider text-[11px]">
+                    Marketplace Guarantees
+                  </div>
+                  <div>• 100% Protected Escrow Hold</div>
+                  <div>• CMM Inspection Report verification</div>
+                  <div>• Vendor Pseudo-name Anti-Bypass Protection</div>
                 </div>
               </div>
             </div>

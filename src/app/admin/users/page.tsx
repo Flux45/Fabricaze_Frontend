@@ -15,57 +15,18 @@ import {
   MapPin,
   ShieldCheck,
   Check,
+  Users,
 } from "lucide-react";
+import { useFabricazeStore } from "@/lib/fabricazeStore";
 
 export default function AdminUsersPage() {
+  const { manufacturers, onboardManufacturer } = useFabricazeStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("All Roles");
   const [statusFilter, setStatusFilter] = useState("All Statuses");
   const [isOnboardModalOpen, setIsOnboardModalOpen] = useState(false);
 
-  const [users, setUsers] = useState([
-    {
-      id: "USR-001",
-      name: "TechCorp Solutions",
-      email: "contact@techcorp.com",
-      role: "Client",
-      status: "Verified",
-      location: "San Francisco, CA / Indore",
-      joinDate: "2024-01-15",
-      activity: "12 jobs posted",
-    },
-    {
-      id: "USR-002",
-      name: "Precision Manufacturing LLC",
-      email: "info@precisionmfg.com",
-      role: "Manufacturer",
-      status: "Verified",
-      location: "Indore, MP",
-      joinDate: "2024-02-08",
-      activity: "28 jobs completed",
-    },
-    {
-      id: "USR-003",
-      name: "StartupXYZ",
-      email: "team@startupxyz.com",
-      role: "Client",
-      status: "Active",
-      location: "Pune, MH",
-      joinDate: "2024-03-12",
-      activity: "3 jobs posted",
-    },
-    {
-      id: "USR-004",
-      name: "Advanced Fabrication Co",
-      email: "orders@advancedfab.com",
-      role: "Manufacturer",
-      status: "Pending",
-      location: "Ahmedabad, GJ",
-      joinDate: "2024-07-10",
-      activity: "0 jobs completed",
-    },
-  ]);
-
+  // Form state
   const [formData, setFormData] = useState({
     companyName: "",
     contactPerson: "",
@@ -74,34 +35,36 @@ export default function AdminUsersPage() {
     city: "Indore",
     state: "Madhya Pradesh",
     gstNumber: "",
-    capabilities: ["CNC Machining"],
+    capabilities: ["CNC Machining", "Lathe Turning"],
     certifications: ["ISO 9001"],
-    verificationStatus: "Verified",
+    verificationStatus: "VERIFIED",
   });
 
-  const toggleVerify = (id: string) => {
-    setUsers((prev) =>
-      prev.map((u) =>
-        u.id === id ? { ...u, status: u.status === "Verified" ? "Pending" : "Verified" } : u
-      )
-    );
-  };
+  // Base list combines registered manufacturers from store
+  const registeredUsers = manufacturers.map((mfg, idx) => ({
+    id: `MFG-${idx + 101}`,
+    name: mfg.pseudoName,
+    email: `contact@${mfg.pseudoName.toLowerCase().replace(/[^a-z0-9]/g, "")}.in`,
+    role: "Manufacturer",
+    status: mfg.verificationStatus === "VERIFIED" ? "Verified" : "Pending",
+    location: `${mfg.city}, ${mfg.state}`,
+    joinDate: "2026-09-28",
+    activity: `${mfg.capabilities.join(", ")}`,
+  }));
 
   const handleOnboardSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const newId = `USR-00${users.length + 1}`;
-    const newUser = {
-      id: newId,
-      name: formData.companyName,
-      email: formData.email,
-      role: "Manufacturer",
-      status: formData.verificationStatus,
-      location: `${formData.city}, ${formData.state === "Madhya Pradesh" ? "MP" : formData.state === "Maharashtra" ? "MH" : "GJ"}`,
-      joinDate: new Date().toISOString().split("T")[0],
-      activity: "0 jobs completed (New Onboarding)",
-    };
+    if (!formData.companyName.trim()) return;
 
-    setUsers([newUser, ...users]);
+    onboardManufacturer({
+      companyName: formData.companyName,
+      city: formData.city,
+      state: formData.state,
+      capabilities: formData.capabilities,
+      certifications: formData.certifications,
+      verificationStatus: "VERIFIED",
+    });
+
     setIsOnboardModalOpen(false);
     alert(`MSME Manufacturer "${formData.companyName}" successfully onboarded with verified status!`);
 
@@ -114,13 +77,13 @@ export default function AdminUsersPage() {
       city: "Indore",
       state: "Madhya Pradesh",
       gstNumber: "",
-      capabilities: ["CNC Machining"],
+      capabilities: ["CNC Machining", "Lathe Turning"],
       certifications: ["ISO 9001"],
-      verificationStatus: "Verified",
+      verificationStatus: "VERIFIED",
     });
   };
 
-  const filteredUsers = users.filter((u) => {
+  const filteredUsers = registeredUsers.filter((u) => {
     const matchSearch =
       u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -134,10 +97,10 @@ export default function AdminUsersPage() {
 
   return (
     <div className="p-6 sm:p-8 space-y-6">
-      {/* Header matching Page 18 mockup + "+ Onboard New Manufacturer" CTA */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">User Management</h1>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Super Admin User & MSME Management</h1>
           <p className="text-xs text-slate-500 mt-0.5">
             Audit client accounts, MSME factory credentials, and verification statuses
           </p>
@@ -162,279 +125,203 @@ export default function AdminUsersPage() {
         </div>
       </div>
 
-      {/* Filter and Search Bar matching mockup */}
-      <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-2xs space-y-3">
-        <span className="text-xs font-bold text-gray-700">Filters & Search</span>
-        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-          <div className="sm:col-span-6 relative">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search users by name or email..."
-              className="w-full text-xs bg-gray-50 border border-gray-200 rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-            />
+      {/* 4 Stat Badges */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-2xs">
+          <div className="text-2xl font-extrabold text-blue-600">{manufacturers.length}</div>
+          <span className="text-xs font-semibold text-gray-500">Total Manufacturers</span>
+        </div>
+        <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-2xs">
+          <div className="text-2xl font-extrabold text-emerald-600">
+            {manufacturers.filter((m) => m.verificationStatus === "VERIFIED").length}
           </div>
-
-          <div className="sm:col-span-3">
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              className="w-full text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-            >
-              <option>All Roles</option>
-              <option>Client</option>
-              <option>Manufacturer</option>
-            </select>
+          <span className="text-xs font-semibold text-gray-500">Verified MSMEs</span>
+        </div>
+        <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-2xs">
+          <div className="text-2xl font-extrabold text-amber-600">
+            {manufacturers.filter((m) => m.verificationStatus !== "VERIFIED").length}
           </div>
-
-          <div className="sm:col-span-3">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-            >
-              <option>All Statuses</option>
-              <option>Verified</option>
-              <option>Active</option>
-              <option>Pending</option>
-            </select>
-          </div>
+          <span className="text-xs font-semibold text-gray-500">Pending Verification</span>
+        </div>
+        <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-2xs">
+          <div className="text-2xl font-extrabold text-slate-800">100%</div>
+          <span className="text-xs font-semibold text-gray-500">Anti-Bypass Protection</span>
         </div>
       </div>
 
-      {/* Users Table matching mockup */}
+      {/* Filter and Search Bar */}
+      <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
+        <div className="relative w-full sm:w-96">
+          <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search by facility name, ID, or city..."
+            className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full sm:w-auto bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option>All Statuses</option>
+            <option>Verified</option>
+            <option>Pending</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Users Table */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-sm font-bold text-slate-900">
-            Users ({filteredUsers.length})
-          </h2>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-gray-50/75 text-gray-500 font-semibold border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-3.5">User</th>
-                <th className="px-6 py-3.5">Role</th>
-                <th className="px-6 py-3.5">Status</th>
-                <th className="px-6 py-3.5">Location</th>
-                <th className="px-6 py-3.5">Join Date</th>
-                <th className="px-6 py-3.5">Activity</th>
-                <th className="px-6 py-3.5 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 text-slate-700">
-              {filteredUsers.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50/50 transition">
-                  <td className="px-6 py-4">
-                    <div className="font-bold text-slate-900">{user.name}</div>
-                    <div className="text-[11px] text-gray-500">{user.email}</div>
-                    <div className="text-[10px] text-gray-400">{user.id}</div>
-                  </td>
-
-                  <td className="px-6 py-4">
-                    <span className="font-medium text-slate-800">{user.role}</span>
-                  </td>
-
-                  <td className="px-6 py-4">
-                    <span
-                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                        user.status === "Verified"
-                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                          : user.status === "Active"
-                          ? "bg-blue-50 text-blue-700 border border-blue-200"
-                          : "bg-amber-50 text-amber-700 border border-amber-200"
-                      }`}
-                    >
-                      {user.status === "Verified" && <CheckCircle className="w-3 h-3" />}
-                      {user.status === "Pending" && <Clock className="w-3 h-3" />}
-                      {user.status}
-                    </span>
-                  </td>
-
-                  <td className="px-6 py-4 text-gray-600">{user.location}</td>
-                  <td className="px-6 py-4 text-gray-500">{user.joinDate}</td>
-                  <td className="px-6 py-4 font-medium text-slate-800">{user.activity}</td>
-
-                  <td className="px-6 py-4 text-right">
-                    <button
-                      onClick={() => toggleVerify(user.id)}
-                      className={`px-2.5 py-1 text-[11px] font-semibold rounded transition ${
-                        user.status === "Verified"
-                          ? "bg-gray-100 hover:bg-gray-200 text-gray-700"
-                          : "bg-emerald-600 hover:bg-emerald-700 text-white"
-                      }`}
-                    >
-                      {user.status === "Verified" ? "Revoke" : "Approve MSME"}
-                    </button>
-                  </td>
+        {filteredUsers.length === 0 ? (
+          <div className="p-12 text-center space-y-4">
+            <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 mx-auto flex items-center justify-center">
+              <Users className="w-8 h-8" />
+            </div>
+            <div className="max-w-md mx-auto space-y-1">
+              <h3 className="text-base font-bold text-slate-900">0 MSMEs in Directory (Clean Slate Mode)</h3>
+              <p className="text-xs text-slate-500">
+                All pre-populated mock manufacturers have been cleared. Click "Onboard New Manufacturer" to register a verified precision workshop.
+              </p>
+            </div>
+            <div className="pt-2">
+              <button
+                onClick={() => setIsOnboardModalOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-2xs transition"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Onboard First MSME</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-gray-50/75 text-gray-500 font-semibold border-b border-gray-200">
+                <tr>
+                  <th className="px-6 py-3.5">User / Facility</th>
+                  <th className="px-6 py-3.5">Role</th>
+                  <th className="px-6 py-3.5">Status</th>
+                  <th className="px-6 py-3.5">Location</th>
+                  <th className="px-6 py-3.5">Capabilities</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-gray-100 text-slate-700">
+                {filteredUsers.map((user) => (
+                  <tr key={user.id} className="hover:bg-gray-50/50 transition">
+                    <td className="px-6 py-4">
+                      <div className="font-bold text-slate-900">{user.name}</div>
+                      <div className="text-[11px] text-gray-500">{user.email}</div>
+                      <div className="text-[10px] text-gray-400 font-mono">{user.id}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="font-medium text-slate-800">{user.role}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <CheckCircle className="w-3 h-3" />
+                        {user.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">{user.location}</td>
+                    <td className="px-6 py-4 font-medium text-slate-800">{user.activity}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* Onboard New Manufacturer Modal */}
+      {/* Onboard Modal */}
       {isOnboardModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 space-y-5 border border-gray-200 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 border border-gray-200 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
                   <Factory className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900 text-base">Onboard New MSME Manufacturer</h3>
-                  <p className="text-xs text-slate-500">Register facility credentials, GSTIN, and machine capabilities</p>
+                  <h3 className="font-bold text-slate-900 text-sm">Super Admin: Onboard Verified MSME</h3>
+                  <span className="text-[10px] text-gray-500">Auto-assigns pseudonym & anti-bypass code</span>
                 </div>
               </div>
-              <button
-                onClick={() => setIsOnboardModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 p-1"
-              >
+              <button onClick={() => setIsOnboardModalOpen(false)} className="text-gray-400 hover:text-gray-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleOnboardSubmit} className="space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Company / Facility Name</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Malwa Precision Engineering"
-                    value={formData.companyName}
-                    onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-                    className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Contact Person</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Anand Sharma"
-                    value={formData.contactPerson}
-                    onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
-                    className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+            <form onSubmit={handleOnboardSubmit} className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">Company / Facility Legal Name</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.companyName}
+                  onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                  placeholder="e.g. Apex Precision Engineering Works"
+                  className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Work Email</label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="contact@malwaprecision.com"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Phone Number</label>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="+91-9826012345"
-                    value={formData.phoneNumber}
-                    onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                    className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Manufacturing Hub</label>
+                  <label className="block text-slate-700 font-semibold mb-1">City</label>
                   <select
                     value={formData.city}
-                    onChange={(e) => {
-                      const c = e.target.value;
-                      let s = "Madhya Pradesh";
-                      if (c === "Pune") s = "Maharashtra";
-                      else if (c === "Ahmedabad") s = "Gujarat";
-                      else if (c === "Bengaluru") s = "Karnataka";
-                      setFormData({ ...formData, city: c, state: s });
-                    }}
-                    className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-2.5 focus:ring-2 focus:ring-blue-500 font-medium"
+                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option>Indore</option>
                     <option>Pune</option>
                     <option>Ahmedabad</option>
+                    <option>Rajkot</option>
                     <option>Bengaluru</option>
+                    <option>Chennai</option>
                   </select>
                 </div>
-
-                <div className="col-span-2">
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    GSTIN / Udyam Registration Number
-                  </label>
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">State</label>
                   <input
                     type="text"
-                    required
-                    placeholder="23AAECM1234F1Z9 or UDYAM-MP-23-009182"
-                    value={formData.gstNumber}
-                    onChange={(e) => setFormData({ ...formData, gstNumber: e.target.value })}
-                    className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-500"
+                    value={formData.state}
+                    onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                    className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Primary Machining Capabilities
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {["CNC Machining", "5-Axis CNC", "Laser Cutting", "Sheet Metal", "3D Printing", "Heat Treatment"].map(
-                    (cap) => (
-                      <label key={cap} className="flex items-center gap-1.5 p-2 rounded-lg bg-gray-50 border border-gray-200 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={formData.capabilities.includes(cap)}
-                          onChange={() => {
-                            setFormData((prev) => ({
-                              ...prev,
-                              capabilities: prev.capabilities.includes(cap)
-                                ? prev.capabilities.filter((c) => c !== cap)
-                                : [...prev.capabilities, cap],
-                            }));
-                          }}
-                          className="rounded text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
-                        />
-                        <span className="text-[11px] font-medium text-slate-800">{cap}</span>
-                      </label>
-                    )
-                  )}
-                </div>
+                <label className="block text-slate-700 font-semibold mb-1">GST Identification Number</label>
+                <input
+                  type="text"
+                  value={formData.gstNumber}
+                  onChange={(e) => setFormData({ ...formData, gstNumber: e.target.value })}
+                  placeholder="23AAACP1234F1Z5"
+                  className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
 
-              <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-100 text-blue-900 text-[11px] flex items-start gap-2">
-                <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                <p>
-                  Anonymized pseudo-name identifier (e.g. <strong>{formData.companyName || "Vendor"} #{formData.city.slice(0, 3).toUpperCase()}-4821</strong>) will be auto-generated to protect the platform from client bypass.
-                </p>
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 text-[11px] leading-relaxed">
+                <strong>Anti-Bypass Compliance:</strong> Fabricaze generates an anonymous ID for buyer interactions to safeguard trade transactions under platform escrow.
               </div>
 
               <div className="flex gap-3 pt-2">
                 <button
                   type="submit"
-                  className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition"
+                  className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition"
                 >
-                  Onboard & Activate Manufacturer
+                  Onboard & Verify Facility
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsOnboardModalOpen(false)}
-                  className="px-5 py-3 rounded-xl border border-gray-300 text-slate-700 font-semibold text-xs hover:bg-gray-50 transition"
+                  className="px-4 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-semibold text-xs hover:bg-gray-50 transition"
                 >
                   Cancel
                 </button>

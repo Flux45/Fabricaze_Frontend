@@ -17,8 +17,12 @@ import {
   Wrench,
 } from "lucide-react";
 
+import { useFabricazeStore } from "@/lib/fabricazeStore";
+import { RotateCcw } from "lucide-react";
+
 export function Header() {
   const pathname = usePathname();
+  const { resetAllToZero } = useFabricazeStore();
   const [activeRole, setActiveRole] = useState<"client" | "manufacturer" | "admin">(
     pathname.startsWith("/admin")
       ? "admin"
@@ -30,7 +34,7 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-xs">
       {/* Demo Switcher & Hub Bar */}
-      <div className="bg-slate-900 text-white text-xs px-4 py-1.5 flex items-center justify-between">
+      <div className="bg-slate-900 text-white text-xs px-4 py-1.5 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
           <span className="font-medium text-slate-300">
@@ -38,6 +42,16 @@ export function Header() {
           </span>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={resetAllToZero}
+            className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-red-950/60 hover:bg-red-900 text-red-200 border border-red-800/80 transition"
+            title="Reset platform data to clean slate"
+          >
+            <RotateCcw className="w-3 h-3 text-red-400" />
+            <span>Reset to Zero</span>
+          </button>
+
           <span className="text-slate-400 hidden sm:inline">Active Perspective:</span>
           <div className="inline-flex rounded-md bg-slate-800 p-0.5 border border-slate-700">
             <Link

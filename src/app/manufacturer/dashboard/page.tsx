@@ -9,58 +9,61 @@ import {
   DollarSign,
   FileText,
   CheckCircle,
-  AlertCircle,
   Plus,
   Send,
   X,
   Layers,
+  ArrowRight,
+  Inbox,
+  Sparkles,
 } from "lucide-react";
+import { useFabricazeStore } from "@/lib/fabricazeStore";
+import { IEnquiry } from "@/types";
 
 export default function ManufacturerDashboard() {
+  const { rfqs, quotations, orders, submitQuotation } = useFabricazeStore();
+
   const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(false);
-  const [selectedRfq, setSelectedRfq] = useState<any | null>(null);
+  const [selectedRfq, setSelectedRfq] = useState<IEnquiry | null>(null);
 
   const [quoteForm, setQuoteForm] = useState({
-    totalCost: 14500,
+    totalCost: 3200,
     leadTimeDays: 7,
-    notes: "Can guarantee ±0.05 mm on bore. Material test and CMM reports included.",
+    notes: "Can machine on our Haas VMC holding ±0.05 mm tolerance. CMM and material inspection report included.",
   });
 
-  const matchingRfqs = [
-    {
-      id: "rfq-1",
-      code: "FAB-2024-1891",
-      title: "Prototype CNC Machining",
-      material: "Aluminum 7075-T6",
-      process: "CNC Machining",
-      quantity: 5,
-      tolerance: "±0.1 mm",
-      targetDelivery: "2026-10-05",
-      budget: "₹2,000 - ₹3,500",
-      clientLocation: "Pune, MH",
-    },
-    {
-      id: "rfq-2",
-      code: "FAB-2024-1890",
-      title: "Sheet Metal Fabrication - Complex Enclosure",
-      material: "SS 304 (2.0 mm)",
-      process: "Laser Cutting & Bending",
-      quantity: 50,
-      tolerance: "±0.2 mm",
-      targetDelivery: "2026-10-20",
-      budget: "₹25,000 - ₹35,000",
-      clientLocation: "Indore, MP",
-    },
-  ];
+  const [lastSubmittedQuoteCode, setLastSubmittedQuoteCode] = useState<string | null>(null);
 
-  const handleOpenQuote = (rfq: any) => {
+  const handleOpenQuote = (rfq: IEnquiry) => {
     setSelectedRfq(rfq);
+    setQuoteForm({
+      totalCost: rfq.estimatedBudgetMin ? Math.round((rfq.estimatedBudgetMin + (rfq.estimatedBudgetMax || 8000)) / 2) : 3200,
+      leadTimeDays: 7,
+      notes: `Can machine ${rfq.title} holding ${rfq.toleranceMm} on our CNC centers. Material test report included.`,
+    });
     setIsQuoteModalOpen(true);
   };
 
   const handleSendQuote = (e: React.FormEvent) => {
     e.preventDefault();
-    alert(`Quotation of ₹${quoteForm.totalCost.toLocaleString()} submitted for ${selectedRfq.code}. Buyer will be notified.`);
+    if (!selectedRfq) return;
+
+    const quote = submitQuotation({
+      enquiryId: selectedRfq.id,
+      totalCostInr: quoteForm.totalCost,
+      leadTimeDays: quoteForm.leadTimeDays,
+      notes: quoteForm.notes,
+      manufacturer: {
+        pseudoName: "Precision MSME #IND-4102",
+        city: "Indore, MP",
+        rating: 4.8,
+        reviewCount: 42,
+        capabilities: ["CNC Machining", "Laser Cutting", "Surface Grinding"],
+        certifications: ["ISO 9001:2015"],
+      },
+    });
+
+    setLastSubmittedQuoteCode(quote.quoteCode);
     setIsQuoteModalOpen(false);
   };
 
@@ -72,17 +75,17 @@ export default function ManufacturerDashboard() {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold uppercase tracking-wider text-amber-600">
-                MSME Shop Floor Portal
+                Manufacturer Hub • Step 2
               </span>
               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                Audited & Verified MSME
+                Verified MSME Shop
               </span>
             </div>
             <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mt-0.5">
-              Precision Tech #IND-4102 • Indore Hub
+              Precision MSME #IND-4102 • Spindle Dashboard
             </h1>
             <p className="text-xs text-slate-500">
-              Udyam Registered: UDYAM-MP-23-009182 • 4.8★ (142 completed jobs)
+              Indore Hub (Pologround) • Ready to bid on client CAD RFQs
             </p>
           </div>
 
@@ -92,35 +95,69 @@ export default function ManufacturerDashboard() {
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white border border-gray-300 text-slate-700 font-semibold text-xs hover:bg-gray-50 transition shadow-2xs"
             >
               <Wrench className="w-3.5 h-3.5 text-blue-600" />
-              <span>Manage Machine Fleet (2 Active)</span>
+              <span>Machine Catalog & Fleet</span>
             </Link>
           </div>
         </div>
 
-        {/* 4 Shop Metrics */}
+        {/* Success Guidance Banner */}
+        {lastSubmittedQuoteCode && (
+          <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-5 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-emerald-600" />
+                <h3 className="font-bold text-slate-900 text-sm">
+                  Quotation #{lastSubmittedQuoteCode} Submitted Successfully!
+                </h3>
+              </div>
+              <button
+                onClick={() => setLastSubmittedQuoteCode(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs text-slate-600">
+              Your competitive quote has been submitted. Now switch back to <strong>Buyer View Bids</strong> to see the quote and award the project into Escrow!
+            </p>
+            <div className="pt-1">
+              <Link
+                href="/client/bids"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition"
+              >
+                <span>Switch to Buyer: View Bids & Award Project</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* 4 Shop Metrics (Live derived) */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-2xs">
-            <span className="text-xs text-gray-500 font-semibold block">Available Matching RFQs</span>
-            <div className="text-2xl font-extrabold text-blue-600 mt-1">2 Live</div>
-            <span className="text-[11px] text-gray-400 block mt-0.5">Based on Haas VMC envelope</span>
+            <span className="text-xs text-gray-500 font-semibold block">Available Open RFQs</span>
+            <div className="text-2xl font-extrabold text-blue-600 mt-1">{rfqs.length}</div>
+            <span className="text-[11px] text-gray-400 block mt-0.5">Matching shop machines</span>
           </div>
 
           <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-2xs">
-            <span className="text-xs text-gray-500 font-semibold block">Active Bids Pending</span>
-            <div className="text-2xl font-extrabold text-amber-600 mt-1">4 Bids</div>
-            <span className="text-[11px] text-gray-400 block mt-0.5">Awaiting buyer decision</span>
+            <span className="text-xs text-gray-500 font-semibold block">Active Bids Submitted</span>
+            <div className="text-2xl font-extrabold text-amber-600 mt-1">{quotations.length}</div>
+            <span className="text-[11px] text-gray-400 block mt-0.5">Pending buyer review</span>
           </div>
 
           <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-2xs">
             <span className="text-xs text-gray-500 font-semibold block">In-Production Orders</span>
-            <div className="text-2xl font-extrabold text-emerald-600 mt-1">1 Batch</div>
-            <span className="text-[11px] text-gray-400 block mt-0.5">₹18,585 in Escrow</span>
+            <div className="text-2xl font-extrabold text-emerald-600 mt-1">{orders.length}</div>
+            <span className="text-[11px] text-gray-400 block mt-0.5">Under milestone progress</span>
           </div>
 
           <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-2xs">
-            <span className="text-xs text-gray-500 font-semibold block">30-Day Disbursed Payout</span>
-            <div className="text-2xl font-extrabold text-slate-900 mt-1">₹1,42,800</div>
-            <span className="text-[11px] text-emerald-600 font-semibold block mt-0.5">100% on-time release</span>
+            <span className="text-xs text-gray-500 font-semibold block">Escrow Secured Funds</span>
+            <div className="text-2xl font-extrabold text-slate-900 mt-1">
+              ₹{orders.reduce((sum, o) => sum + o.totalAmountInr, 0).toLocaleString()}
+            </div>
+            <span className="text-[11px] text-emerald-600 font-semibold block mt-0.5">Protected escrow</span>
           </div>
         </div>
 
@@ -129,65 +166,98 @@ export default function ManufacturerDashboard() {
           <div className="flex items-center justify-between border-b border-gray-100 pb-3">
             <div>
               <h2 className="text-base font-bold text-slate-900">
-                Open RFQs Matching Your Machines
+                Incoming Client RFQs Matching Shop Capabilities
               </h2>
               <p className="text-xs text-gray-500">
-                Instant opportunities routed to your shop based on registered tolerance (±0.05mm) and spindle envelope
+                Live opportunities posted by clients requiring precision CNC milling, turning, or fabrication
               </p>
             </div>
             <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
-              Auto-Matched
+              {rfqs.length} Available
             </span>
           </div>
 
-          <div className="space-y-4">
-            {matchingRfqs.map((rfq) => (
-              <div
-                key={rfq.id}
-                className="p-5 rounded-xl border border-gray-200 hover:border-blue-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
-              >
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-slate-900 text-sm">{rfq.title}</span>
-                    <span className="text-xs text-gray-400">{rfq.code}</span>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
-                    <span>Material: <strong>{rfq.material}</strong></span>
-                    <span>•</span>
-                    <span>Quantity: <strong>{rfq.quantity} pcs</strong></span>
-                    <span>•</span>
-                    <span>Tolerance: <strong>{rfq.tolerance}</strong></span>
-                    <span>•</span>
-                    <span>Required by: <strong>{rfq.targetDelivery}</strong></span>
-                  </div>
-
-                  <div className="text-xs text-slate-500">
-                    Buyer Target Budget: <strong className="text-slate-800">{rfq.budget}</strong>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => handleOpenQuote(rfq)}
-                    className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-2xs transition"
-                  >
-                    Submit Quotation
-                  </button>
-                </div>
+          {rfqs.length === 0 ? (
+            <div className="p-12 text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-gray-100 text-gray-400 mx-auto flex items-center justify-center">
+                <Inbox className="w-6 h-6" />
               </div>
-            ))}
-          </div>
+              <h3 className="font-bold text-slate-800 text-sm">No Open RFQs Right Now</h3>
+              <p className="text-xs text-gray-500 max-w-md mx-auto">
+                The platform is in a fresh zero state. Start the testing flow by acting as a client and submitting a custom CAD drawing!
+              </p>
+              <div className="pt-2">
+                <Link
+                  href="/client/submit-job"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-2xs transition"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Post First Inquiry as Client</span>
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {rfqs.map((rfq) => {
+                const hasQuoted = quotations.some((q) => q.enquiryId === rfq.id);
+                return (
+                  <div
+                    key={rfq.id}
+                    className="p-5 rounded-2xl border border-gray-200 hover:border-blue-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+                  >
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900 text-sm">{rfq.title}</span>
+                        <span className="text-xs text-blue-600 font-semibold">{rfq.enquiryCode}</span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700">
+                          {rfq.status}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
+                        <span>Material: <strong>{rfq.rawMaterialType}</strong></span>
+                        <span>•</span>
+                        <span>Quantity: <strong>{rfq.quantity} pcs</strong></span>
+                        <span>•</span>
+                        <span>Tolerance: <strong>{rfq.toleranceMm}</strong></span>
+                        <span>•</span>
+                        <span>Target: <strong>{rfq.requiredDeliveryDate}</strong></span>
+                      </div>
+
+                      <div className="text-xs text-slate-500">
+                        Estimated Budget Range: <strong className="text-slate-800">₹{rfq.estimatedBudgetMin?.toLocaleString()} – ₹{rfq.estimatedBudgetMax?.toLocaleString()}</strong>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      {hasQuoted ? (
+                        <span className="px-4 py-2 rounded-xl bg-emerald-50 text-emerald-700 font-semibold text-xs border border-emerald-200">
+                          ✓ Quote Submitted
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleOpenQuote(rfq)}
+                          className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-md transition cursor-pointer"
+                        >
+                          Submit Quotation
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Submit Quotation Modal */}
         {isQuoteModalOpen && selectedRfq && (
           <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 border border-gray-200 shadow-2xl">
+            <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-5 border border-gray-200 shadow-2xl">
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                 <div>
                   <h3 className="font-bold text-slate-900 text-base">Submit Competitive Quotation</h3>
-                  <span className="text-xs text-gray-500">{selectedRfq.title} ({selectedRfq.code})</span>
+                  <span className="text-xs text-gray-500">{selectedRfq.title} ({selectedRfq.enquiryCode})</span>
                 </div>
                 <button onClick={() => setIsQuoteModalOpen(false)} className="text-gray-400 hover:text-gray-600">
                   <X className="w-5 h-5" />
@@ -201,12 +271,13 @@ export default function ManufacturerDashboard() {
                   </label>
                   <input
                     type="number"
+                    required
                     value={quoteForm.totalCost}
                     onChange={(e) => setQuoteForm({ ...quoteForm, totalCost: parseInt(e.target.value) || 0 })}
-                    className="w-full text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 font-bold text-slate-900 focus:ring-2 focus:ring-blue-500"
+                    className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 font-bold text-slate-900 focus:ring-2 focus:ring-blue-500"
                   />
                   <span className="text-[11px] text-gray-500 mt-1 block">
-                    GST (18%) of ₹{Math.round(quoteForm.totalCost * 0.18).toLocaleString()} will be automatically added by platform.
+                    GST (18%) of ₹{Math.round(quoteForm.totalCost * 0.18).toLocaleString()} will be charged to the buyer automatically.
                   </span>
                 </div>
 
@@ -216,35 +287,36 @@ export default function ManufacturerDashboard() {
                   </label>
                   <input
                     type="number"
+                    required
                     value={quoteForm.leadTimeDays}
                     onChange={(e) => setQuoteForm({ ...quoteForm, leadTimeDays: parseInt(e.target.value) || 1 })}
-                    className="w-full text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 font-semibold text-slate-900 focus:ring-2 focus:ring-blue-500"
+                    className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 font-semibold text-slate-900 focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Manufacturer Notes & Quality Guarantee
+                    Manufacturer Notes & Tolerances Commitment
                   </label>
                   <textarea
                     rows={3}
                     value={quoteForm.notes}
                     onChange={(e) => setQuoteForm({ ...quoteForm, notes: e.target.value })}
-                    className="w-full text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-blue-500"
+                    className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
                 <div className="flex gap-3 pt-2">
                   <button
                     type="submit"
-                    className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition"
+                    className="flex-1 py-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-md transition"
                   >
-                    Send Quotation to Buyer
+                    Transmit Quotation to Client
                   </button>
                   <button
                     type="button"
                     onClick={() => setIsQuoteModalOpen(false)}
-                    className="px-4 py-2.5 rounded-xl border border-gray-300 text-slate-700 font-semibold text-xs hover:bg-gray-50 transition"
+                    className="px-5 py-3 rounded-xl border border-gray-300 text-slate-700 font-semibold text-xs hover:bg-gray-50 transition"
                   >
                     Cancel
                   </button>

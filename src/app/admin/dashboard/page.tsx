@@ -11,62 +11,47 @@ import {
   Clock,
   CheckCircle,
   ExternalLink,
+  ArrowRight,
+  ShieldCheck,
+  RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
+import { useFabricazeStore } from "@/lib/fabricazeStore";
 
 export default function AdminDashboardPage() {
+  const { rfqs, quotations, orders, disputes, manufacturers, resetAllToZero } = useFabricazeStore();
+
+  const totalEscrowVolumeInr = orders.reduce((sum, o) => sum + o.totalAmountInr, 0);
+  const openDisputesCount = disputes.filter((d) => d.status === "Open").length;
+
   const kpis = [
     {
       label: "Total Jobs Posted",
-      value: "1,247",
-      change: "+12% from last month",
-      trend: "up",
+      value: rfqs.length.toString(),
+      subtext: rfqs.length === 0 ? "Clean slate (0 jobs)" : `${rfqs.length} active RFQs`,
       icon: Briefcase,
+      color: "text-blue-600 bg-blue-50",
     },
     {
-      label: "Active Manufacturers",
-      value: "89",
-      change: "+5 this week",
-      trend: "up",
+      label: "Vetted MSME Partners",
+      value: manufacturers.length.toString(),
+      subtext: manufacturers.length === 0 ? "Clean slate (0 MSMEs)" : `${manufacturers.length} verified facilities`,
       icon: Factory,
+      color: "text-indigo-600 bg-indigo-50",
     },
     {
-      label: "Total Revenue",
-      value: "$54,892",
-      change: "+18% from last month",
-      trend: "up",
+      label: "Total Escrow Volume",
+      value: `₹${totalEscrowVolumeInr.toLocaleString()}`,
+      subtext: orders.length === 0 ? "₹0 locked in escrow" : `${orders.length} funded orders`,
       icon: DollarSign,
+      color: "text-emerald-600 bg-emerald-50",
     },
     {
-      label: "Pending Quotations",
-      value: "23",
-      change: "-8% from last week",
-      trend: "down",
+      label: "Quotations Received",
+      value: quotations.length.toString(),
+      subtext: quotations.length === 0 ? "0 submitted bids" : `${quotations.length} total bids`,
       icon: FileCheck2,
-    },
-  ];
-
-  const subKpis = [
-    {
-      label: "Active Disputes",
-      value: "7",
-      note: "2 resolved today",
-      icon: AlertTriangle,
-      color: "text-amber-600",
-    },
-    {
-      label: "New Registrations",
-      value: "34",
-      note: "+6% this week",
-      icon: UserPlus,
-      color: "text-blue-600",
-    },
-    {
-      label: "Completion Rate",
-      value: "94.2%",
-      note: "+2.1% this month",
-      icon: TrendingUp,
-      color: "text-emerald-600",
+      color: "text-amber-600 bg-amber-50",
     },
   ];
 
@@ -75,158 +60,168 @@ export default function AdminDashboardPage() {
       {/* Top Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Executive Dashboard</h1>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Super Admin Executive Dashboard</h1>
           <p className="text-xs text-slate-500 mt-1">
-            Real-time platform throughput, MSME spindle capacity, and financial metrics
+            Real-time platform throughput, MSME spindle capacity, and financial escrow telemetry
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              if (confirm("Reset the entire platform to ZERO state? All RFQs, quotes, orders, and disputes will be cleared.")) {
+                resetAllToZero();
+              }
+            }}
+            className="px-3 py-2 border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold rounded-xl transition flex items-center gap-1.5"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Reset to Zero</span>
+          </button>
           <Link
-            href="/admin/quotes"
+            href="/admin/jobs"
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-2xs transition"
           >
-            Review Quotations (23)
+            Manage Jobs ({rfqs.length})
           </Link>
         </div>
       </div>
 
-      {/* Primary KPI Cards (4 cols) matching Page 17 mockup */}
+      {/* Primary KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {kpis.map((kpi) => {
           const Icon = kpi.icon;
           return (
             <div
               key={kpi.label}
-              className="bg-white rounded-2xl p-5 border border-gray-200 shadow-2xs space-y-2"
+              className="bg-white rounded-2xl p-5 border border-gray-200 shadow-2xs space-y-3"
             >
-              <div className="flex items-center justify-between text-gray-500 text-xs">
-                <span className="font-semibold">{kpi.label}</span>
-                <Icon className="w-4 h-4 text-gray-400" />
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{kpi.label}</span>
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${kpi.color}`}>
+                  <Icon className="w-4 h-4" />
+                </div>
               </div>
-              <div className="text-3xl font-extrabold text-slate-900 tracking-tight">
-                {kpi.value}
-              </div>
-              <div className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
-                <span>{kpi.change}</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Secondary KPI Cards (3 cols) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {subKpis.map((kpi) => {
-          const Icon = kpi.icon;
-          return (
-            <div
-              key={kpi.label}
-              className="bg-white rounded-2xl p-5 border border-gray-200 shadow-2xs flex items-center justify-between"
-            >
               <div>
-                <span className="text-xs font-semibold text-gray-500 block">{kpi.label}</span>
-                <div className="text-2xl font-extrabold text-slate-900 mt-0.5">{kpi.value}</div>
-                <span className="text-[11px] text-gray-400 block mt-0.5">{kpi.note}</span>
-              </div>
-              <div className={`p-3 rounded-xl bg-gray-50 ${kpi.color}`}>
-                <Icon className="w-6 h-6" />
+                <div className="text-2xl font-extrabold text-slate-900 tracking-tight">{kpi.value}</div>
+                <span className="text-[11px] text-gray-500 mt-0.5 block">{kpi.subtext}</span>
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* Two Column Bottom Grid: Platform Activity & Urgent Actions matching mockup */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left: Platform Activity */}
-        <div className="lg:col-span-6 bg-white rounded-2xl p-6 border border-gray-200 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-blue-600" />
-              Platform Activity
-            </h3>
-            <span className="text-xs text-gray-400">Current Week</span>
+      {/* Sub KPIs Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-xs text-gray-500 block">Active Quality Disputes</span>
+            <span className="text-lg font-bold text-red-600 mt-0.5 block">{openDisputesCount}</span>
+            <span className="text-[10px] text-gray-400">Escrow payouts frozen</span>
           </div>
-
-          <div className="space-y-3 text-xs">
-            <div className="flex justify-between py-2 border-b border-gray-50">
-              <span className="text-gray-600">Jobs posted this week:</span>
-              <span className="font-bold text-slate-900">127</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-gray-50">
-              <span className="text-gray-600">Quotes submitted:</span>
-              <span className="font-bold text-slate-900">298</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-gray-50">
-              <span className="text-gray-600">Jobs completed:</span>
-              <span className="font-bold text-emerald-600">84</span>
-            </div>
-            <div className="flex justify-between py-2">
-              <span className="text-gray-600">Revenue generated:</span>
-              <span className="font-extrabold text-blue-600 text-sm">$12,847</span>
-            </div>
-          </div>
+          <AlertTriangle className="w-6 h-6 text-red-500" />
         </div>
 
-        {/* Right: Urgent Actions Required matching mockup */}
-        <div className="lg:col-span-6 bg-white rounded-2xl p-6 border border-gray-200 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-500" />
-              Urgent Actions Required
-            </h3>
-            <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded">
-              3 Pending
+        <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-xs text-gray-500 block">Active Production Batches</span>
+            <span className="text-lg font-bold text-blue-600 mt-0.5 block">
+              {orders.filter((o) => o.currentMilestone !== "DELIVERED").length}
             </span>
+            <span className="text-[10px] text-gray-400">On shop floors</span>
+          </div>
+          <Clock className="w-6 h-6 text-blue-500" />
+        </div>
+
+        <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-xs text-gray-500 block">Delivered & Verified Orders</span>
+            <span className="text-lg font-bold text-emerald-600 mt-0.5 block">
+              {orders.filter((o) => o.currentMilestone === "DELIVERED").length}
+            </span>
+            <span className="text-[10px] text-gray-400">Escrow released</span>
+          </div>
+          <CheckCircle className="w-6 h-6 text-emerald-500" />
+        </div>
+      </div>
+
+      {/* Real-Time Platform Activity Stream */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left: Recent RFQs */}
+        <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+            <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+              <Briefcase className="w-4 h-4 text-blue-600" />
+              Recent RFQs
+            </h3>
+            <Link href="/admin/jobs" className="text-xs text-blue-600 hover:text-blue-800 font-semibold">
+              View All ({rfqs.length})
+            </Link>
           </div>
 
-          <div className="space-y-3">
-            {/* Urgent Item 1 */}
-            <div className="p-3.5 rounded-xl bg-red-50/70 border border-red-100 flex items-start gap-3">
-              <div className="w-2 h-2 rounded-full bg-red-500 mt-1.5 shrink-0"></div>
-              <div className="flex-1 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-red-950">High-value dispute escalation</span>
-                  <Link href="/admin/disputes" className="text-red-700 font-semibold hover:underline">
-                    Mediate
-                  </Link>
-                </div>
-                <p className="text-red-800/80 mt-0.5">
-                  Job #FAB-2024-1892 • $24,500 held in escrow
-                </p>
-              </div>
+          {rfqs.length === 0 ? (
+            <div className="py-8 text-center text-xs text-gray-400">
+              0 RFQs currently posted. The platform is in clean reset state.
             </div>
+          ) : (
+            <div className="space-y-3">
+              {rfqs.slice(0, 4).map((rfq) => (
+                <div
+                  key={rfq.id}
+                  className="p-3 bg-slate-50 rounded-xl border border-gray-100 flex items-center justify-between text-xs"
+                >
+                  <div>
+                    <span className="font-mono text-[10px] text-blue-600 font-bold block">{rfq.enquiryCode}</span>
+                    <span className="font-semibold text-slate-900">{rfq.title}</span>
+                    <span className="text-[10px] text-gray-500 block">
+                      {rfq.quantity} pcs • {rfq.rawMaterialType}
+                    </span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">
+                    {rfq.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
-            {/* Urgent Item 2 */}
-            <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-100 flex items-start gap-3">
-              <div className="w-2 h-2 rounded-full bg-amber-500 mt-1.5 shrink-0"></div>
-              <div className="flex-1 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-amber-950">Manufacturer verification pending</span>
-                  <Link href="/admin/users" className="text-amber-800 font-semibold hover:underline">
-                    Review
-                  </Link>
-                </div>
-                <p className="text-amber-800/80 mt-0.5">
-                  3 applications awaiting shop floor audit and GST check
-                </p>
-              </div>
-            </div>
-
-            {/* Urgent Item 3 */}
-            <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-100 flex items-start gap-3">
-              <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 shrink-0"></div>
-              <div className="flex-1 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-blue-950">System maintenance scheduled</span>
-                  <span className="text-blue-700 font-medium">Auto</span>
-                </div>
-                <p className="text-blue-800/80 mt-0.5">
-                  Tomorrow at 2:00 AM IST (Automated GST invoice batching)
-                </p>
-              </div>
-            </div>
+        {/* Right: Active Production Orders */}
+        <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+            <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              Active Orders & Escrow
+            </h3>
+            <Link href="/client/orders" className="text-xs text-blue-600 hover:text-blue-800 font-semibold">
+              Client View ({orders.length})
+            </Link>
           </div>
+
+          {orders.length === 0 ? (
+            <div className="py-8 text-center text-xs text-gray-400">
+              0 orders currently in production. No escrow deposits locked.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {orders.slice(0, 4).map((order) => (
+                <div
+                  key={order.id}
+                  className="p-3 bg-slate-50 rounded-xl border border-gray-100 flex items-center justify-between text-xs"
+                >
+                  <div>
+                    <span className="font-mono text-[10px] text-blue-600 font-bold block">{order.orderNumber}</span>
+                    <span className="font-semibold text-slate-900">{order.enquiryTitle}</span>
+                    <span className="text-[10px] text-gray-500 block">
+                      ₹{order.totalAmountInr.toLocaleString()} • {order.manufacturerPseudo}
+                    </span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
+                    {order.currentMilestone}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

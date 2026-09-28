@@ -28,6 +28,8 @@ export const metadata: Metadata = {
   ],
 };
 
+import { FabricazeStoreProvider } from "@/lib/fabricazeStore";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -36,9 +38,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${plusJakartaSans.variable}`}>
       <body className="min-h-screen flex flex-col font-sans antialiased bg-slate-50 text-slate-900">
-        <Header />
-        <main className="flex-1">{children}</main>
-        <Footer />
+        <FabricazeStoreProvider>
+          <Header />
+          <main className="flex-1">{children}</main>
+          <Footer />
+        </FabricazeStoreProvider>
       </body>
     </html>
   );

@@ -15,29 +15,45 @@ import {
   Check,
   X,
   Send,
+  ArrowRight,
+  AlertCircle,
+  Sparkles,
 } from "lucide-react";
-import { INITIAL_BIDS } from "@/lib/mockData";
+import { useFabricazeStore } from "@/lib/fabricazeStore";
 import { IQuotation } from "@/types";
 
 export default function ViewBidsPage() {
-  const [bids, setBids] = useState<IQuotation[]>(INITIAL_BIDS);
+  const { rfqs, quotations, awardQuotation } = useFabricazeStore();
+
+  // If there are RFQs, default to the most recent one
+  const activeRfq = rfqs.length > 0 ? rfqs[0] : null;
+  const [selectedRfqId, setSelectedRfqId] = useState<string>(activeRfq?.id || "");
+
+  const currentRfq = rfqs.find((r) => r.id === selectedRfqId) || activeRfq;
+
+  // Filter quotes relevant to current RFQ (or all quotes if no specific RFQ)
+  const relevantQuotes = currentRfq
+    ? quotations.filter((q) => q.enquiryId === currentRfq.id)
+    : quotations;
+
   const [selectedCity, setSelectedCity] = useState("All Cities");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
-  const [selectedBidId, setSelectedBidId] = useState<string | null>("bid-1");
+  const [selectedBidId, setSelectedBidId] = useState<string | null>(null);
   const [isAwardModalOpen, setIsAwardModalOpen] = useState(false);
   const [isAwarded, setIsAwarded] = useState(false);
+  const [awardedOrderId, setAwardedOrderId] = useState<string | null>(null);
   const [activeChatBid, setActiveChatBid] = useState<IQuotation | null>(null);
   const [chatMessage, setChatMessage] = useState("");
   const [chatHistory, setChatHistory] = useState<{ sender: string; text: string; time: string }[]>([
     {
       sender: "Manufacturer",
-      text: "Hello! We have reviewed your .STEP drawing for Job #MFG-2024-001. We can hold ±0.05 mm on the critical bore using our Haas VMC. Let us know if you need material test certificates.",
+      text: "Hello! We reviewed your CAD specifications. We can hold tight tolerances on all critical features and provide CMM inspection reports upon machining.",
       time: "10:30 AM",
     },
   ]);
 
   // Filter & sort logic
-  const filteredBids = bids
+  const filteredBids = relevantQuotes
     .filter((bid) => {
       if (selectedCity === "All Cities") return true;
       return bid.manufacturer.city.toLowerCase().includes(selectedCity.toLowerCase());
@@ -48,7 +64,7 @@ export default function ViewBidsPage() {
         : b.totalCostInr - a.totalCostInr;
     });
 
-  const selectedBid = bids.find((b) => b.id === selectedBidId);
+  const selectedBid = filteredBids.find((b) => b.id === (selectedBidId || filteredBids[0]?.id));
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,6 +74,14 @@ export default function ViewBidsPage() {
       { sender: "You", text: chatMessage, time: "Just now" },
     ]);
     setChatMessage("");
+  };
+
+  const handleConfirmAward = () => {
+    if (!currentRfq || !selectedBid) return;
+    const newOrder = awardQuotation(currentRfq.id, selectedBid.id);
+    setIsAwardModalOpen(false);
+    setIsAwarded(true);
+    setAwardedOrderId(newOrder.id);
   };
 
   return (
@@ -71,264 +95,348 @@ export default function ViewBidsPage() {
             </span>
             <div className="flex flex-wrap items-baseline gap-3">
               <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
-                CNC Aluminum Housing - Job #MFG-2024-001
+                {currentRfq ? currentRfq.title : "Manufacturing RFQ Quotations"}
               </h1>
+              {currentRfq && (
+                <span className="text-xs font-mono bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-gray-200">
+                  {currentRfq.enquiryCode}
+                </span>
+              )}
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
-                4 Bids Received
+                {relevantQuotes.length} {relevantQuotes.length === 1 ? "Bid" : "Bids"} Received
               </span>
             </div>
-            <p className="text-xs text-gray-500 mt-1">
-              10 pieces • Aluminum 6061-T6 • ±0.1mm tolerance • Required by Oct 15
-            </p>
+            {currentRfq ? (
+              <p className="text-xs text-gray-500 mt-1">
+                {currentRfq.quantity} units • {currentRfq.rawMaterialType} • Tolerance {currentRfq.toleranceMm} • Required by {currentRfq.requiredDeliveryDate}
+              </p>
+            ) : (
+              <p className="text-xs text-gray-500 mt-1">
+                Submit an RFQ to invite verified MSME machine shops to bid on your manufacturing requirement.
+              </p>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
+            {rfqs.length > 1 && (
+              <select
+                value={selectedRfqId}
+                onChange={(e) => {
+                  setSelectedRfqId(e.target.value);
+                  setIsAwarded(false);
+                }}
+                className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {rfqs.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.enquiryCode} - {r.title}
+                  </option>
+                ))}
+              </select>
+            )}
+
             <button
-              onClick={() => selectedBidId && setIsAwardModalOpen(true)}
-              disabled={!selectedBidId || isAwarded}
+              onClick={() => setIsAwardModalOpen(true)}
+              disabled={relevantQuotes.length === 0 || isAwarded}
               className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-xs shadow-sm transition ${
                 isAwarded
                   ? "bg-emerald-600 text-white cursor-default"
-                  : selectedBidId
+                  : relevantQuotes.length > 0
                   ? "bg-emerald-600 hover:bg-emerald-700 text-white active:scale-98"
                   : "bg-gray-200 text-gray-400 cursor-not-allowed"
               }`}
             >
               <Award className="w-4 h-4" />
-              <span>{isAwarded ? "Project Awarded (In Production)" : "Award Project (1 selected)"}</span>
+              <span>{isAwarded ? "Project Awarded (In Escrow)" : "Award Project to Selected Bid"}</span>
             </button>
           </div>
         </div>
 
-        {/* Filter & Sort Controls matching mockup */}
-        <div className="bg-white rounded-xl p-3 border border-gray-200 shadow-2xs mb-6 flex flex-wrap items-center justify-between gap-4 text-xs">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 text-gray-500">
-              <Filter className="w-3.5 h-3.5" />
-              <span>Filter:</span>
-            </div>
-            <select
-              value={selectedCity}
-              onChange={(e) => setSelectedCity(e.target.value)}
-              className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 font-medium text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            >
-              <option>All Cities</option>
-              <option>Indore</option>
-              <option>Pune</option>
-              <option>Ahmedabad</option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 text-gray-500">
-              <ArrowUpDown className="w-3.5 h-3.5" />
-              <span>Sort:</span>
-            </div>
-            <button
-              onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-              className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 font-medium text-gray-700 hover:bg-gray-100 flex items-center gap-1"
-            >
-              <span>Price: {sortOrder === "asc" ? "Low to High" : "High to Low"}</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Bids List matching Page 15 / Page 9 mockup */}
-        <div className="space-y-4">
-          {filteredBids.map((bid) => {
-            const isSelected = selectedBidId === bid.id;
-            return (
-              <div
-                key={bid.id}
-                onClick={() => setSelectedBidId(bid.id)}
-                className={`bg-white rounded-2xl p-6 border transition-all cursor-pointer relative shadow-2xs ${
-                  isSelected
-                    ? "border-blue-600 ring-2 ring-blue-500/20 shadow-md"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-                  {/* Radio / Selection Checkbox + Vendor Info (Cols 1-6) */}
-                  <div className="lg:col-span-6 flex items-start gap-4">
-                    <input
-                      type="radio"
-                      name="selected_bid"
-                      checked={isSelected}
-                      onChange={() => setSelectedBidId(bid.id)}
-                      className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 cursor-pointer"
-                    />
-
-                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 font-bold flex items-center justify-center text-sm shrink-0 border border-blue-100">
-                      {bid.manufacturer.pseudoName.charAt(0)}
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-slate-900 text-sm">
-                          {bid.manufacturer.pseudoName}
-                        </h3>
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          <CheckCircle className="w-3 h-3" /> Verified
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-3 text-xs text-gray-500">
-                        <span className="flex items-center gap-1 text-amber-500 font-semibold">
-                          <Star className="w-3.5 h-3.5 fill-current" />
-                          <span>{bid.manufacturer.rating}</span>
-                          <span className="text-gray-400 font-normal">
-                            ({bid.manufacturer.reviewCount || 98} reviews)
-                          </span>
-                        </span>
-                        <span>•</span>
-                        <span>{bid.manufacturer.city}</span>
-                      </div>
-
-                      <p className="text-xs text-slate-600 pt-1 leading-relaxed">
-                        {bid.notes}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Pricing & Lead Time (Cols 7-9) */}
-                  <div className="lg:col-span-3 lg:border-l border-gray-100 lg:pl-6 space-y-2">
-                    <div>
-                      <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block">
-                        Total Quote
-                      </span>
-                      <div className="text-2xl font-extrabold text-blue-600">
-                        ₹{bid.totalCostInr.toLocaleString()}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-gray-600">
-                      <Clock className="w-3.5 h-3.5 text-amber-500" />
-                      <span>Lead Time: <strong>{bid.deliveryDate}</strong></span>
-                    </div>
-                  </div>
-
-                  {/* Capabilities, Certifications & Actions (Cols 10-12) */}
-                  <div className="lg:col-span-3 lg:border-l border-gray-100 lg:pl-6 space-y-3">
-                    <div>
-                      <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider block mb-1">
-                        Capabilities
-                      </span>
-                      <div className="flex flex-wrap gap-1">
-                        {bid.manufacturer.capabilities?.map((cap) => (
-                          <span
-                            key={cap}
-                            className="px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-700"
-                          >
-                            {cap}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider block mb-1">
-                        Certifications
-                      </span>
-                      <div className="flex flex-wrap gap-1">
-                        {bid.manufacturer.certifications?.map((cert) => (
-                          <span
-                            key={cert}
-                            className="px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100"
-                          >
-                            {cert}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="pt-2 flex items-center gap-3 text-xs">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          alert(`Viewing capability portfolio for ${bid.manufacturer.pseudoName}`);
-                        }}
-                        className="text-gray-600 hover:text-blue-600 font-semibold"
-                      >
-                        View Portfolio
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveChatBid(bid);
-                        }}
-                        className="text-blue-600 hover:text-blue-700 font-semibold flex items-center gap-1"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        <span>Message</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
+        {/* Success Banner if awarded */}
+        {isAwarded && (
+          <div className="mb-6 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                <Check className="w-5 h-5" />
               </div>
-            );
-          })}
-        </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm">Escrow Funded & Production Initiated!</h3>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  100% of the funds are safely locked in platform escrow. The manufacturer has been notified to commence drawing review & material sourcing.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/client/orders"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shrink-0 transition shadow-sm"
+            >
+              <span>Track Shop Floor Milestones</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        )}
 
-        {/* Award Project Modal with Escrow Breakdown */}
-        {isAwardModalOpen && selectedBid && (
-          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-5 border border-gray-200 shadow-2xl">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <Award className="w-5 h-5 text-emerald-600" />
-                  <h3 className="font-bold text-slate-900 text-base">Confirm Project Award</h3>
+        {/* Zero State if no quotations */}
+        {relevantQuotes.length === 0 ? (
+          <div className="bg-white rounded-2xl p-12 border border-gray-200 text-center shadow-2xs space-y-4">
+            <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 mx-auto flex items-center justify-center">
+              <Clock className="w-8 h-8" />
+            </div>
+            <div className="max-w-md mx-auto space-y-2">
+              <h3 className="text-lg font-bold text-slate-900">0 Quotations Received (Clean State)</h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                {currentRfq
+                  ? `Your RFQ "${currentRfq.title}" (${currentRfq.enquiryCode}) is posted and live in the Manufacturer Hub. Log in as a manufacturer to submit a quotation against it!`
+                  : "You haven't submitted any manufacturing RFQs yet. Upload your CAD drawing to initiate the process."}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+              <Link
+                href="/client/submit-job"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition"
+              >
+                <span>Upload New CAD / Post RFQ</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+              <Link
+                href="/manufacturer/dashboard"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-sm transition"
+              >
+                <span>Switch to Manufacturer Hub & Place Bid</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Filter & Sort Controls */}
+            <div className="bg-white rounded-xl p-3 border border-gray-200 shadow-2xs mb-6 flex flex-wrap items-center justify-between gap-4 text-xs">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 text-gray-500">
+                  <Filter className="w-3.5 h-3.5" />
+                  <span>Filter:</span>
+                </div>
+                <select
+                  value={selectedCity}
+                  onChange={(e) => setSelectedCity(e.target.value)}
+                  className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 font-medium text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option>All Cities</option>
+                  <option>Indore</option>
+                  <option>Pune</option>
+                  <option>Ahmedabad</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 text-gray-500">
+                  <ArrowUpDown className="w-3.5 h-3.5" />
+                  <span>Sort:</span>
                 </div>
                 <button
-                  onClick={() => setIsAwardModalOpen(false)}
-                  className="text-gray-400 hover:text-gray-600"
+                  onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                  className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 font-medium text-gray-700 hover:bg-gray-100 flex items-center gap-1"
                 >
+                  <span>Price: {sortOrder === "asc" ? "Low to High" : "High to Low"}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Bids List */}
+            <div className="space-y-4">
+              {filteredBids.map((bid) => {
+                const isSelected = (selectedBidId || filteredBids[0]?.id) === bid.id;
+                return (
+                  <div
+                    key={bid.id}
+                    onClick={() => setSelectedBidId(bid.id)}
+                    className={`bg-white rounded-2xl border transition duration-150 p-5 sm:p-6 cursor-pointer relative ${
+                      isSelected
+                        ? "border-blue-600 ring-2 ring-blue-500/20 shadow-md"
+                        : "border-gray-200 hover:border-gray-300 shadow-2xs"
+                    }`}
+                  >
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                      {/* Left: Manufacturer Pseudo info */}
+                      <div className="lg:col-span-4 space-y-3">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900 text-sm">
+                            {bid.manufacturer.pseudoName}
+                          </span>
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                            <ShieldCheck className="w-3 h-3" /> Verified MSME
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-4 text-xs text-gray-500">
+                          <span className="flex items-center gap-1 font-medium text-slate-700">
+                            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                            {bid.manufacturer.rating} ({bid.manufacturer.reviewCount} reviews)
+                          </span>
+                          <span>•</span>
+                          <span>{bid.manufacturer.city}</span>
+                        </div>
+
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {(bid.manufacturer.capabilities || []).map((cap) => (
+                            <span
+                              key={cap}
+                              className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium"
+                            >
+                              {cap}
+                            </span>
+                          ))}
+                        </div>
+
+                        <div className="pt-2 text-xs text-slate-500">
+                          <p className="italic bg-slate-50 p-2.5 rounded-xl border border-gray-100">
+                            "{bid.notes}"
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Middle: Breakdown & Lead Time */}
+                      <div className="lg:col-span-5 grid grid-cols-2 gap-4 border-y lg:border-y-0 lg:border-x border-gray-100 py-4 lg:py-0 lg:px-6">
+                        <div>
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 block">
+                            Cost Breakdown
+                          </span>
+                          <div className="mt-2 space-y-1 text-xs">
+                            <div className="flex justify-between text-gray-500">
+                              <span>Machining:</span>
+                              <span className="font-medium text-slate-700">₹{(bid.machiningCostInr || 0).toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between text-gray-500">
+                              <span>Raw Material:</span>
+                              <span className="font-medium text-slate-700">₹{(bid.materialCostInr || 0).toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between text-gray-500">
+                              <span>Tooling/Setup:</span>
+                              <span className="font-medium text-slate-700">₹{(bid.toolingCostInr || 0).toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between text-gray-500">
+                              <span>GST (18%):</span>
+                              <span className="font-medium text-slate-700">₹{(bid.taxGstInr || Math.round(bid.totalCostInr * 0.18)).toLocaleString()}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 block">
+                            Delivery & Compliance
+                          </span>
+                          <div className="mt-2 space-y-2 text-xs">
+                            <div className="flex items-center gap-1.5 text-slate-700">
+                              <Clock className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                              <span className="font-medium">{bid.deliveryDate}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-emerald-700">
+                              <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span>CMM Report Included</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-slate-600">
+                              <Building className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                              <span>{(bid.manufacturer.certifications || ["ISO 9001"]).join(", ")}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right: Price & CTA */}
+                      <div className="lg:col-span-3 flex flex-col items-end justify-between h-full space-y-4">
+                        <div className="text-right">
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 block">
+                            Total Quotation
+                          </span>
+                          <div className="text-2xl font-black text-slate-900 tracking-tight">
+                            ₹{(bid.totalCostInr + (bid.taxGstInr || Math.round(bid.totalCostInr * 0.18))).toLocaleString()}
+                          </div>
+                          <span className="text-[10px] text-gray-400 block">Includes 18% GST + Escrow</span>
+                        </div>
+
+                        <div className="w-full flex gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveChatBid(bid);
+                            }}
+                            className="flex-1 py-2 px-3 rounded-xl border border-gray-200 text-slate-700 hover:bg-gray-50 text-xs font-semibold flex items-center justify-center gap-1 transition"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            <span>Discuss</span>
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedBidId(bid.id);
+                              setIsAwardModalOpen(true);
+                            }}
+                            className="flex-1 py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center justify-center gap-1 transition shadow-2xs"
+                          >
+                            <Award className="w-3.5 h-3.5" />
+                            <span>Award</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {/* Escrow Award Confirmation Modal */}
+        {isAwardModalOpen && selectedBid && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 border border-gray-200 shadow-2xl space-y-5">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-sm">Award Project & Fund Escrow</h3>
+                    <span className="text-[10px] text-gray-500">{selectedBid.manufacturer.pseudoName}</span>
+                  </div>
+                </div>
+                <button onClick={() => setIsAwardModalOpen(false)} className="text-gray-400 hover:text-gray-600">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               <div className="space-y-3 text-xs">
-                <p className="text-slate-600">
-                  You are awarding <strong>Job #MFG-2024-001</strong> to <strong>{selectedBid.manufacturer.pseudoName}</strong>.
-                </p>
-
-                {/* Price Breakdown */}
-                <div className="bg-slate-50 rounded-xl p-4 border border-gray-200 space-y-2">
+                <div className="bg-slate-50 p-4 rounded-xl border border-gray-100 space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Base Machining & Parts (10 pcs):</span>
-                    <span className="font-semibold text-slate-900">₹{selectedBid.totalCostInr.toLocaleString()}</span>
+                    <span className="text-gray-500">Job Title:</span>
+                    <span className="font-semibold text-slate-800">{currentRfq?.title || "Custom Part"}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">GST (18% Input Credit available):</span>
-                    <span className="font-semibold text-slate-900">₹{Math.round(selectedBid.totalCostInr * 0.18).toLocaleString()}</span>
+                    <span className="text-gray-500">Quotation Total:</span>
+                    <span className="font-semibold text-slate-800">₹{selectedBid.totalCostInr.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Fabricaze Escrow Guarantee:</span>
-                    <span className="font-semibold text-emerald-600">Included (Free)</span>
+                    <span className="text-gray-500">GST (18%):</span>
+                    <span className="font-semibold text-slate-800">
+                      ₹{(selectedBid.taxGstInr || Math.round(selectedBid.totalCostInr * 0.18)).toLocaleString()}
+                    </span>
                   </div>
-                  <div className="pt-2 border-t border-gray-200 flex justify-between text-sm font-bold text-slate-900">
-                    <span>Total Placed in Escrow:</span>
-                    <span className="text-blue-600">₹{Math.round(selectedBid.totalCostInr * 1.18).toLocaleString()}</span>
+                  <div className="border-t border-gray-200 pt-2 flex justify-between font-bold text-sm text-slate-900">
+                    <span>Total Escrow Deposit:</span>
+                    <span className="text-emerald-700">
+                      ₹{(selectedBid.totalCostInr + (selectedBid.taxGstInr || Math.round(selectedBid.totalCostInr * 0.18))).toLocaleString()}
+                    </span>
                   </div>
                 </div>
 
-                <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100 text-emerald-800 text-[11px] space-y-1">
-                  <div className="font-semibold flex items-center gap-1">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    Fabricaze Escrow Protection
-                  </div>
-                  <p>
-                    Funds remain protected in third-party escrow. The manufacturer is paid only after dimensional verification against your CMM tolerance criteria.
-                  </p>
+                <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-blue-900 text-[11px] leading-relaxed">
+                  <strong>Fabricaze Escrow Protection:</strong> Funds remain securely locked in platform escrow. The manufacturer is paid only after you inspect and accept the parts against CMM tolerance criteria.
                 </div>
               </div>
 
               <div className="flex gap-3 pt-2">
                 <button
-                  onClick={() => {
-                    setIsAwardModalOpen(false);
-                    setIsAwarded(true);
-                  }}
+                  onClick={handleConfirmAward}
                   className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition"
                 >
                   Confirm & Fund Escrow
@@ -348,7 +456,6 @@ export default function ViewBidsPage() {
         {activeChatBid && (
           <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl max-w-lg w-full flex flex-col h-[520px] border border-gray-200 shadow-2xl overflow-hidden">
-              {/* Header */}
               <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
                 <div>
                   <h3 className="font-bold text-sm">{activeChatBid.manufacturer.pseudoName}</h3>
@@ -359,7 +466,6 @@ export default function ViewBidsPage() {
                 </button>
               </div>
 
-              {/* Chat Messages */}
               <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-50 text-xs">
                 {chatHistory.map((msg, i) => (
                   <div
@@ -380,7 +486,6 @@ export default function ViewBidsPage() {
                 ))}
               </div>
 
-              {/* Input */}
               <form onSubmit={handleSendMessage} className="p-3 bg-white border-t border-gray-200 flex gap-2">
                 <input
                   type="text"
