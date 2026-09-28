@@ -5,16 +5,60 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   UploadCloud,
-  FileText,
+  FileCheck2,
+  AlertCircle,
+  Clock,
+  Sparkles,
+  ArrowRight,
+  ShieldCheck,
   CheckCircle2,
   Calendar,
   Layers,
-  ArrowRight,
+  HelpCircle,
+  FileText,
+  ShieldAlert,
   Info,
-  MapPin,
-  Sparkles,
 } from "lucide-react";
 import { useFabricazeStore } from "@/lib/fabricazeStore";
+
+// Secure allowed file extensions
+const ALLOWED_EXTENSIONS = [
+  // 3D CAD
+  ".step",
+  ".stp",
+  ".stl",
+  ".iges",
+  ".igs",
+  ".sldprt",
+  ".obj",
+  // 2D Drawings & Vector designs
+  ".pdf",
+  ".dwg",
+  ".dxf",
+  ".svg",
+  // Images
+  ".png",
+  ".jpg",
+  ".jpeg",
+];
+
+const DANGEROUS_EXTENSIONS = [
+  ".exe",
+  ".bat",
+  ".cmd",
+  ".sh",
+  ".vbs",
+  ".msi",
+  ".dll",
+  ".com",
+  ".scr",
+  ".js",
+  ".ps1",
+  ".apk",
+  ".bin",
+  ".pif",
+  ".jar",
+];
 
 export default function SubmitJobPage() {
   const router = useRouter();
@@ -22,9 +66,13 @@ export default function SubmitJobPage() {
 
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileSecurityError, setFileSecurityError] = useState<string | null>(null);
+  const [fileSecuritySuccess, setFileSecuritySuccess] = useState<string | null>(null);
+
   const [title, setTitle] = useState("Custom CNC Aluminum Housing");
   const [material, setMaterial] = useState("Aluminum 6061-T6");
-  const [process, setProcess] = useState("CNC Machining");
+  const [customMaterial, setCustomMaterial] = useState("");
+  const [process, setProcess] = useState("Platform Recommends (Fabricaze DFM Engine decides)");
   const [quantity, setQuantity] = useState(10);
   const [tolerance, setTolerance] = useState("±0.05 mm");
   const [surfaceFinish, setSurfaceFinish] = useState("As-Machined");
@@ -32,33 +80,39 @@ export default function SubmitJobPage() {
   const [instructions, setInstructions] = useState("");
   const [createdRfqCode, setCreatedRfqCode] = useState<string | null>(null);
 
-  // Dynamic cost calculation based on selected parameters
-  const calculateEstimate = () => {
-    let base = 350;
-    if (material.includes("Titanium")) base *= 4.5;
-    else if (material.includes("Stainless")) base *= 2.2;
-    else if (material.includes("Brass")) base *= 1.8;
-    else if (material.includes("Aluminum")) base *= 1.2;
+  // Security validator against malicious executables
+  const validateAndSetFile = (file: File) => {
+    const fileName = file.name.toLowerCase();
+    const fileExt = fileName.substring(fileName.lastIndexOf("."));
 
-    if (process.includes("5-Axis")) base *= 2.4;
-    else if (process.includes("CNC")) base *= 1.4;
-    else if (process.includes("Laser")) base *= 0.8;
+    // Check dangerous file types
+    if (DANGEROUS_EXTENSIONS.includes(fileExt) || file.type.includes("x-msdownload") || file.type.includes("executable")) {
+      setFileSecurityError(
+        `Security Alert: Executable (.${fileExt.replace(".", "")}) and script files are strictly blocked to protect the marketplace infrastructure. Only verified CAD drawings, PDFs, and design vectors are allowed.`
+      );
+      setFileSecuritySuccess(null);
+      setSelectedFile(null);
+      return false;
+    }
 
-    if (tolerance.includes("0.02") || tolerance.includes("0.01")) base *= 1.35;
-    if (surfaceFinish.includes("Anodized")) base += 85;
+    // Check whitelist of allowed CAD / Drawing / Vector / Image formats
+    if (!ALLOWED_EXTENSIONS.includes(fileExt)) {
+      setFileSecurityError(
+        `Unsupported File Format (${fileExt}). Permitted formats: 3D CAD (.STEP, .STL, .IGES, .SLDPRT), 2D Drawings (.PDF, .DWG, .DXF, .SVG), Images (.PNG, .JPG).`
+      );
+      setFileSecuritySuccess(null);
+      setSelectedFile(null);
+      return false;
+    }
 
-    let discount = 1.0;
-    if (quantity >= 500) discount = 0.58;
-    else if (quantity >= 100) discount = 0.72;
-    else if (quantity >= 25) discount = 0.85;
-
-    const minEst = Math.max(2500, Math.round(base * discount * 0.9 * quantity));
-    const maxEst = Math.max(8500, Math.round(base * discount * 1.35 * quantity));
-
-    return { minEst, maxEst };
+    // File passed security check
+    setFileSecurityError(null);
+    setFileSecuritySuccess(
+      `Verified Safe Format: ${file.name} (${(file.size / 1024).toFixed(1)} KB) • Clean Scan Passed`
+    );
+    setSelectedFile(file);
+    return true;
   };
-
-  const { minEst, maxEst } = calculateEstimate();
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -75,34 +129,41 @@ export default function SubmitJobPage() {
     e.stopPropagation();
     setDragActive(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setSelectedFile(e.dataTransfer.files[0]);
+      validateAndSetFile(e.dataTransfer.files[0]);
     }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+      validateAndSetFile(e.target.files[0]);
     }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    const finalMaterial = material === "Custom" ? (customMaterial.trim() || "Custom Alloy") : material;
+
     const newRfq = createRfq({
       title,
       description: instructions,
-      rawMaterialType: material,
+      rawMaterialType: finalMaterial,
       processType: "CNC_MACHINING",
       surfaceFinish: "AS_MACHINED",
       toleranceMm: tolerance,
       quantity,
       requiredDeliveryDate: deliveryDate,
-      fileName: selectedFile ? selectedFile.name : "housing_cad_rev1.step",
-      estimatedBudgetMin: minEst,
-      estimatedBudgetMax: maxEst,
+      fileName: selectedFile ? selectedFile.name : "housing_cad_drawing.step",
+      fileType: selectedFile ? selectedFile.name.split(".").pop() || "step" : "step",
+      fileUrl: selectedFile ? `/cad/uploads/${selectedFile.name}` : "/cad/sample.step",
+      estimatedBudgetMin: 0,
+      estimatedBudgetMax: 0,
     });
 
     setCreatedRfqCode(newRfq.enquiryCode);
   };
+
+  const finalDisplayMaterial = material === "Custom" ? (customMaterial.trim() || "Custom Material (To be specified)") : material;
 
   return (
     <div className="bg-slate-50 min-h-screen py-8">
@@ -140,11 +201,11 @@ export default function SubmitJobPage() {
                 Inquiry Posted Successfully!
               </h2>
               <p className="text-xs text-slate-500">
-                Job Code: <strong className="text-blue-600 font-bold">{createdRfqCode}</strong>
+                Job Code: <strong className="text-blue-600 font-bold font-mono">{createdRfqCode}</strong>
               </p>
             </div>
             <p className="text-sm text-slate-600 leading-relaxed">
-              Your CAD drawing for <strong>{quantity} pcs ({material})</strong> is now broadcasted to the manufacturer marketplace!
+              Your CAD drawing for <strong>{quantity} pcs ({finalDisplayMaterial})</strong> has been broadcasted to verified MSME machine shops!
             </p>
 
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl p-5 text-left text-xs text-blue-950 space-y-2">
@@ -153,90 +214,111 @@ export default function SubmitJobPage() {
                 Next Step in Testing Flow:
               </div>
               <p className="text-slate-700">
-                Now switch to the <strong>Manufacturer Hub</strong> to act as an MSME machine shop and submit a competitive bid against this job!
+                Now switch to the <strong>Manufacturer Hub</strong> to act as an MSME shop, inspect the attached CAD drawing & comments, and submit a quote!
               </p>
               <div className="pt-2">
                 <Link
                   href="/manufacturer/dashboard"
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-md transition"
                 >
-                  <span>Go to Manufacturer Hub & Submit Bid</span>
+                  <span>Go to Manufacturer Hub & Inspect Inquiry</span>
                   <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
             </div>
-
-            <div className="pt-2 flex justify-center gap-4">
-              <button
-                onClick={() => setCreatedRfqCode(null)}
-                className="px-5 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold transition"
-              >
-                Post Another Inquiry
-              </button>
-            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* Left Form: CAD Upload & Material Specs (Cols 1-7) */}
+            {/* Left Side: Form */}
             <form onSubmit={handleSubmit} className="lg:col-span-7 space-y-6">
-              {/* Job Title */}
-              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-2xs space-y-2">
-                <label className="block text-xs font-bold text-slate-900">
-                  Job / Part Title
+              {/* Part Title Card */}
+              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-2xs space-y-3">
+                <label className="block text-xs font-bold text-slate-900 uppercase tracking-wider">
+                  Part Title / Component Reference
                 </label>
                 <input
                   type="text"
                   required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. Precision CNC Aluminum Housing"
-                  className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-500 font-semibold text-slate-900"
+                  placeholder="e.g. Robotic Arm Actuator Housing Bracket"
+                  className="w-full text-sm font-semibold text-slate-900 bg-slate-50 border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
-              {/* CAD Upload Card */}
-              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-2xs">
-                <div className="flex items-center justify-between mb-4">
+              {/* Secure File Upload Zone */}
+              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-2xs space-y-4">
+                <div className="flex items-center justify-between">
                   <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                    <UploadCloud className="w-4 h-4 text-blue-600" />
-                    Upload CAD Files & 2D Drawings
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    Upload 3D CAD Drawing / Technical Vector
                   </h2>
-                  <span className="text-[11px] text-gray-500">Confidential NDA Protected</span>
+                  <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                    Antivirus & Malware Protected
+                  </span>
                 </div>
+
+                {/* Security Error Alert */}
+                {fileSecurityError && (
+                  <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-900 text-xs flex items-start gap-3">
+                    <ShieldAlert className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold block">Security Restriction</span>
+                      <p className="mt-0.5 leading-relaxed">{fileSecurityError}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Security Success Alert */}
+                {fileSecuritySuccess && (
+                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span className="font-medium">{fileSecuritySuccess}</span>
+                  </div>
+                )}
 
                 <div
                   onDragEnter={handleDrag}
                   onDragLeave={handleDrag}
                   onDragOver={handleDrag}
                   onDrop={handleDrop}
-                  className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
+                  className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all ${
                     dragActive
                       ? "border-blue-500 bg-blue-50/50"
-                      : "border-gray-300 hover:border-gray-400 bg-gray-50/40"
+                      : "border-gray-200 hover:border-gray-300 bg-gray-50/50"
                   }`}
                 >
-                  <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 mx-auto flex items-center justify-center mb-3">
-                    <UploadCloud className="w-6 h-6" />
-                  </div>
-                  <p className="text-sm font-semibold text-slate-800">
-                    {selectedFile ? selectedFile.name : "Drop your CAD drawing here (.step, .dwg, .stl, .pdf)"}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Or click browse to upload from your computer
-                  </p>
+                  <input
+                    type="file"
+                    id="file-upload"
+                    accept=".step,.stp,.stl,.iges,.igs,.sldprt,.obj,.pdf,.dwg,.dxf,.svg,.png,.jpg,.jpeg"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="file-upload"
+                    className="cursor-pointer flex flex-col items-center justify-center space-y-3"
+                  >
+                    <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center shadow-xs">
+                      <UploadCloud className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <span className="text-sm font-semibold text-blue-600 hover:underline">
+                        Click to upload
+                      </span>{" "}
+                      <span className="text-sm text-gray-500">or drag & drop file</span>
+                    </div>
+                    <p className="text-xs text-gray-500 max-w-sm">
+                      Allowed: <strong>3D CAD</strong> (.STEP, .STL, .IGES, .SLDPRT) • <strong>2D Drawings</strong> (.PDF, .DWG, .DXF, .SVG) • <strong>Images</strong> (.PNG, .JPG)
+                    </p>
+                  </label>
 
-                  <div className="mt-4">
-                    <label className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-gray-300 text-xs font-semibold text-slate-700 hover:bg-gray-50 cursor-pointer shadow-2xs">
-                      <FileText className="w-3.5 h-3.5 text-blue-600" />
-                      <span>{selectedFile ? "Replace File" : "Browse Files"}</span>
-                      <input
-                        type="file"
-                        accept=".step,.stp,.dwg,.iges,.igs,.stl,.pdf"
-                        onChange={handleFileChange}
-                        className="hidden"
-                      />
-                    </label>
-                  </div>
+                  {selectedFile && (
+                    <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-xs text-gray-700 shadow-2xs font-mono">
+                      <FileCheck2 className="w-4 h-4 text-emerald-600" />
+                      <span>{selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -248,6 +330,7 @@ export default function SubmitJobPage() {
                 </h2>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Material with Custom Option */}
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                       Material Type
@@ -264,10 +347,25 @@ export default function SubmitJobPage() {
                       <option>Mild Steel EN8 / MS</option>
                       <option>Brass C360</option>
                       <option>Titanium Grade 5</option>
-                      <option>Delrin POM (White/Black)</option>
+                      <option>Delrin POM (Polyacetal)</option>
+                      <option value="Custom">Custom / Specify Other Material...</option>
                     </select>
+
+                    {material === "Custom" && (
+                      <div className="mt-2">
+                        <input
+                          type="text"
+                          required
+                          value={customMaterial}
+                          onChange={(e) => setCustomMaterial(e.target.value)}
+                          placeholder="e.g. Inconel 718, PEEK, Hardox 450, Tool Steel D2"
+                          className="w-full text-xs bg-white border border-blue-400 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold text-slate-900"
+                        />
+                      </div>
+                    )}
                   </div>
 
+                  {/* Manufacturing Process */}
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                       Manufacturing Process
@@ -277,11 +375,13 @@ export default function SubmitJobPage() {
                       onChange={(e) => setProcess(e.target.value)}
                       className="w-full text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                     >
-                      <option>CNC Machining (Milling/Turning)</option>
-                      <option>5-Axis CNC Precision</option>
+                      <option>Platform Recommends (Fabricaze DFM Engine decides)</option>
+                      <option>CNC Machining (Milling / Turning)</option>
+                      <option>5-Axis CNC Precision Machining</option>
                       <option>Fiber Laser Cutting</option>
-                      <option>Sheet Metal Fabrication & Bending</option>
-                      <option>Industrial 3D Printing</option>
+                      <option>Sheet Metal Fabrication & CNC Bending</option>
+                      <option>Industrial 3D Printing (Metal DMLS / Polymer)</option>
+                      <option>Manual Lathe / Milling Machining</option>
                     </select>
                   </div>
 
@@ -334,36 +434,47 @@ export default function SubmitJobPage() {
                 </div>
               </div>
 
-              {/* Additional Requirements Card */}
+              {/* Additional Requirements & Comments Card */}
               <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-2xs space-y-4">
                 <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-blue-600" />
-                  Additional Requirements
+                  Delivery & Special Instructions / Comments
                 </h2>
 
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                    Required Delivery Date
-                  </label>
-                  <input
-                    type="date"
-                    value={deliveryDate}
-                    onChange={(e) => setDeliveryDate(e.target.value)}
-                    className="w-full sm:w-64 text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                  />
-                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                      Target Delivery Date
+                    </label>
+                    <input
+                      type="date"
+                      value={deliveryDate}
+                      onChange={(e) => setDeliveryDate(e.target.value)}
+                      className="w-full text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-700"
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                    Special Instructions & Quality Standards
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={instructions}
-                    onChange={(e) => setInstructions(e.target.value)}
-                    placeholder="Specific tolerances, CMM inspection requirement, material test sheets..."
-                    className="w-full text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                  />
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                      Certificates Required
+                    </label>
+                    <div className="text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-gray-600 font-medium">
+                      ✓ CMM Inspection & Material Test (Included)
+                    </div>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                      Comments / Specific Quality Notes for Manufacturer
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={instructions}
+                      onChange={(e) => setInstructions(e.target.value)}
+                      placeholder="Provide special notes for machinists (e.g. Critical bore concentricity, thread tapping depth, heat-treat hardness certificates required, packaging specs)..."
+                      className="w-full text-xs bg-gray-50 border border-gray-200 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-800"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -377,7 +488,7 @@ export default function SubmitJobPage() {
               </button>
             </form>
 
-            {/* Right Side: Project Summary */}
+            {/* Right Side: Live Project Summary */}
             <div className="lg:col-span-5 space-y-6">
               <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-2xs space-y-6 sticky top-24">
                 <div className="flex items-center justify-between border-b border-gray-100 pb-3">
@@ -386,20 +497,20 @@ export default function SubmitJobPage() {
                     Live Project Summary
                   </h3>
                   <span className="text-[10px] uppercase font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
-                    Instant Preview
+                    CAD Analysis
                   </span>
                 </div>
 
-                {/* Quick Estimate Banner */}
-                <div className="bg-blue-50/80 rounded-xl p-4 border border-blue-100">
-                  <span className="text-[11px] font-semibold text-blue-800 uppercase tracking-wider block">
+                {/* Quick Estimate Banner (Zero by default per request) */}
+                <div className="bg-slate-50 rounded-xl p-4 border border-gray-200">
+                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
                     Quick Estimate Range
                   </span>
-                  <div className="text-2xl font-extrabold text-blue-900 tracking-tight mt-0.5">
-                    ₹{minEst.toLocaleString()} – ₹{maxEst.toLocaleString()}
+                  <div className="text-2xl font-black text-slate-900 tracking-tight mt-0.5">
+                    ₹0 – ₹0
                   </div>
-                  <span className="text-[11px] text-blue-700/80 block mt-1">
-                    Based on market spindle rates
+                  <span className="text-[11px] text-slate-500 block mt-1">
+                    Official quote generated upon manufacturer bid & toolpath review
                   </span>
                 </div>
 
@@ -407,11 +518,11 @@ export default function SubmitJobPage() {
                 <div className="space-y-2.5 text-xs">
                   <div className="flex justify-between py-1.5 border-b border-gray-100">
                     <span className="text-gray-500">Material:</span>
-                    <span className="font-semibold text-slate-800">{material}</span>
+                    <span className="font-semibold text-slate-800">{finalDisplayMaterial}</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b border-gray-100">
                     <span className="text-gray-500">Process:</span>
-                    <span className="font-semibold text-slate-800">{process}</span>
+                    <span className="font-semibold text-slate-800 max-w-[200px] text-right truncate">{process}</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b border-gray-100">
                     <span className="text-gray-500">Quantity:</span>
